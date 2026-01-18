@@ -1,6 +1,6 @@
 # 📁 MadCamp02: 최종 통합 명세서
 
-**Ver 2.7 - Complete Edition (Spec-Driven Alignment)**
+**Ver 2.7.3 - Complete Edition (Spec-Driven Alignment)**
 
 ---
 
@@ -17,6 +17,9 @@
 | 2.5 | 2026-01-18 | 실제 구현된 프론트엔드 페이지(Market, Shop, Trade) 명세 공식화 | MadCamp02 |
 | **2.6** | **2026-01-18** | **하이브리드 인증 아키텍처(Frontend/Backend Driven) 반영** | **MadCamp02** |
 | **2.7** | **2026-01-18** | **정합성 기준 고정 및 엔드포인트/용어 문구 정리(라우트/실시간/인증)** | **MadCamp02** |
+| **2.7.1** | **2026-01-18** | **Phase 0: 응답 DTO(최소 필드) 규약/예시 JSON 추가 + STOMP 엔드포인트(`/ws-stomp`) 정합성 고정** | **MadCamp02** |
+| **2.7.2** | **2026-01-18** | **테스트 경로 정규화(src/test/java) 반영 및 CI/CD 단계의 테스트 전략(후속) 명시** | **MadCamp02** |
+| **2.7.3** | **2026-01-18** | **Phase 1: `items.category` 레거시→목표 매핑 표 및 Unknown 값 마이그레이션 실패(raise) 정책 고정** | **MadCamp02** |
 
 ### Ver 2.6 주요 변경 사항
 
@@ -28,6 +31,20 @@
 
 1.  **정합성 기준(Single Source of Truth) 고정**: 본 문서와 개발 계획서(`FRONTEND_DEVELOPMENT_PLAN`, `BACKEND_DEVELOPMENT_PLAN`)를 기준으로 구현을 동기화.
 2.  **Frontend 구현 현황 표현 정리**: “실제 구현 반영”이라고 단정된 항목 중, 현 시점 코드와 불일치하는 라우트/실시간/인증 표현을 **구현 예정(Phase 1~3)**으로 정리.
+
+### Ver 2.7.1 주요 변경 사항
+
+1.  **응답 DTO 규약 고정(프론트 연동 선행)**: 리스트 응답의 확장성을 위해 `items` 패턴을 채택하고, Market/Portfolio/Inventory/Ranking의 **최소 필드 스키마 + 예시 JSON**을 명시.
+2.  **실시간(STOMP) 엔드포인트 정합성 고정**: 문서 기준 엔드포인트를 `/ws-stomp`로 고정(백엔드 보안 예외/설정은 코드에서 반영).
+
+### Ver 2.7.2 주요 변경 사항
+
+1.  **CI에서 테스트 “실행” 정합성**: 테스트 경로를 표준(`src/test/java`)로 정규화하여 Gradle/CI가 테스트를 탐지할 수 있는 전제를 고정.
+2.  **통합 테스트 전략(후속)**: Postgres/Redis/Flyway 의존 통합 테스트는 CI/CD 단계에서 “서비스 컨테이너 추가” 또는 “테스트 프로파일/컨테이너 전략” 중 하나로 고정(세부는 백엔드 개발 계획서 Phase 8 참조).
+
+### Ver 2.7.3 주요 변경 사항
+
+1.  **`items.category` 정합성 정책(Fail Fast) 고정**: 레거시→목표 카테고리 매핑 표를 명시하고, Unknown 값이 남아있으면 Flyway V3 마이그레이션을 실패(raise)시켜 배포를 차단.
 
 ---
 
@@ -213,11 +230,197 @@ CREATE TABLE items (
 );
 ```
 
+##### `items.category` 레거시→목표 매핑 정책 (Phase 1 고정)
+
+Flyway V3에서 아래 매핑으로 **기존 데이터(category 문자열)**를 목표 체계로 전환합니다.
+
+| Legacy Category (V1) | Target Category (Phase 1+) | 비고 |
+|---|---|---|
+| `COSTUME` | `AVATAR` | 아바타 꾸미기 아이템(레거시) |
+| `ACCESSORY` | `AVATAR` | 아바타 꾸미기 아이템(레거시) |
+| `AURA` | `AVATAR` | 아바타 꾸미기 아이템(레거시) |
+| `BACKGROUND` | `THEME` | 화면/배경 계열(레거시) |
+
+##### Unknown 처리 정책 (Fail Fast, Phase 1 고정)
+
+- Flyway V3는 마이그레이션 완료 후 `items.category`에 `NAMEPLATE | AVATAR | THEME` 외 값이 남아있으면 **즉시 실패(raise)**해야 합니다.
+- (권장) DB 제약(`CHECK`)을 추가해 이후 잘못된 값이 들어오는 것을 원천 차단합니다.
+
 *(나머지 테이블 `wallet`, `portfolio`, `trade_logs`, `inventory`, `watchlist`, `chat_history`, `notifications`는 Ver 2.4와 동일)*
 
 ---
 
 ## 5. API 명세
+
+### 5.0 공통 응답 규약 (Phase 0: Interface Freeze)
+
+본 프로젝트는 **전역 `ApiResponse{ success, data }` 래퍼를 사용하지 않고**, 엔드포인트별 Response DTO를 그대로 반환합니다. (Spring에서 흔히 쓰이는 “DTO Direct Response” 방식)
+
+#### 5.0.1 성공 응답 (2xx)
+
+- **Content-Type**: `application/json; charset=utf-8`
+- **Body**: 아래 5.0.3의 “최소 필드 스키마”를 따르는 JSON
+- **리스트 응답 표준(확장성 목적)**: 리스트는 배열을 바로 내리지 않고 아래처럼 감쌉니다.
+
+```json
+{
+  "items": []
+}
+```
+
+> 이유: 추후 `asOf`, `nextCursor`, `totalCount` 등 메타데이터를 추가할 때 프론트/백엔드 변경 범위를 최소화합니다.
+
+#### 5.0.2 에러 응답 (4xx/5xx)
+
+에러는 `ErrorResponse` DTO를 사용합니다.
+
+```json
+{
+  "timestamp": "2026-01-18T12:00:00",
+  "status": 400,
+  "error": "TRADE_001",
+  "message": "잔고가 부족합니다."
+}
+```
+
+#### 5.0.3 타입/단위 규약
+
+- **시간 문자열**: ISO-8601 문자열 (예: `"2026-01-18T12:00:00"`). *(현재 서버 구현은 timezone offset을 포함하지 않을 수 있음)*
+- **퍼센트**: `changePercent`, `pnlPercent`는 **\(-100 ~ 100\)** 범위의 “% 값”을 사용 (예: 1.23 = 1.23%)
+- **통화**: `currency`는 ISO-4217 코드(예: `"USD"`, `"KRW"`)
+- **수치**: 금액/가격/평가금액은 `number`로 내려주고, 표시는 프론트에서 포매팅
+
+### 5.0.4 Phase 0: 최소 응답 DTO 스키마(프론트 연동 선행)
+
+아래 스키마는 **프론트 페이지(시장/포트폴리오/상점/마이페이지/랭킹)**가 실데이터로 전환하기 위해 필요한 “최소 필드”만 우선 고정합니다.
+
+#### A) Market: Indices (`GET /api/v1/market/indices`)
+
+```json
+{
+  "asOf": "2026-01-18T12:00:00",
+  "items": [
+    {
+      "code": "KOSPI",
+      "name": "KOSPI",
+      "value": 2650.12,
+      "change": 12.34,
+      "changePercent": 0.47,
+      "currency": "KRW"
+    }
+  ]
+}
+```
+
+- `code`: 프론트 표시/맵핑 키 (예: KOSPI, NASDAQ, SP500)
+- `value/change/changePercent`: 카드/차트 요약에 사용
+
+#### B) Market: News (`GET /api/v1/market/news`)
+
+```json
+{
+  "asOf": "2026-01-18T12:00:00",
+  "items": [
+    {
+      "id": "finnhub:123456",
+      "headline": "Market headline",
+      "summary": "Short summary",
+      "source": "Reuters",
+      "url": "https://example.com/news/123456",
+      "imageUrl": "https://example.com/image.jpg",
+      "publishedAt": "2026-01-18T11:50:00"
+    }
+  ]
+}
+```
+
+#### C) Market: Movers (`GET /api/v1/market/movers`)
+
+```json
+{
+  "asOf": "2026-01-18T12:00:00",
+  "items": [
+    {
+      "ticker": "AAPL",
+      "name": "Apple Inc.",
+      "price": 195.12,
+      "changePercent": -1.23,
+      "volume": 12345678,
+      "direction": "DOWN"
+    }
+  ]
+}
+```
+
+- `direction`: `"UP" | "DOWN"` (UI 배지/색상)
+
+#### D) Portfolio (`GET /api/v1/trade/portfolio`)
+
+```json
+{
+  "asOf": "2026-01-18T12:00:00",
+  "summary": {
+    "totalEquity": 10500.0,
+    "cashBalance": 2500.0,
+    "totalPnl": 500.0,
+    "totalPnlPercent": 5.0,
+    "currency": "USD"
+  },
+  "positions": [
+    {
+      "ticker": "AAPL",
+      "quantity": 10,
+      "avgPrice": 180.0,
+      "currentPrice": 195.12,
+      "marketValue": 1951.2,
+      "pnl": 151.2,
+      "pnlPercent": 8.4
+    }
+  ]
+}
+```
+
+#### E) Inventory (`GET /api/v1/game/inventory`)
+
+```json
+{
+  "items": [
+    {
+      "itemId": 1,
+      "name": "Golden Frame",
+      "category": "NAMEPLATE",
+      "rarity": "EPIC",
+      "imageUrl": "https://example.com/item.png",
+      "equipped": true
+    }
+  ]
+}
+```
+
+#### F) Ranking (`GET /api/v1/game/ranking`)
+
+```json
+{
+  "asOf": "2026-01-18T12:00:00",
+  "items": [
+    {
+      "rank": 1,
+      "userId": 10,
+      "nickname": "pjjpj",
+      "avatarUrl": "https://example.com/avatar.png",
+      "totalEquity": 10500.0,
+      "returnPercent": 5.0
+    }
+  ],
+  "my": {
+    "rank": 12,
+    "totalEquity": 9800.0,
+    "returnPercent": -2.0
+  }
+}
+```
+
+> 랭킹 계산/정렬 기준(예: `returnPercent` vs `totalEquity`)은 Phase 5에서 확정 구현하되, **프론트 표시 최소 필드**는 Phase 0에서 고정합니다.
 
 ### 5.1 인증 API (`/api/v1/auth`)
 
@@ -343,5 +546,5 @@ MadCamp02는 유연한 연동을 위해 두 가지 인증 흐름을 모두 제�
 
 ---
 
-**문서 버전:** 2.7 (Spec-Driven Alignment)
+**문서 버전:** 2.7.3 (Spec-Driven Alignment)
 **최종 수정일:** 2026-01-18
