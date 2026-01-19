@@ -1,6 +1,6 @@
 # ⚙️ MadCamp02: 백엔드 개발 계획서
 
-**Ver 2.7.8 - Backend Development Blueprint (Spec-Driven Alignment)**
+**Ver 2.7.14 - Backend Development Blueprint (Spec-Driven Alignment)**
 
 ---
 
@@ -25,6 +25,12 @@
 | **2.7.6** | **2026-01-19** | **데이터 전략 반영: EODHD + DB 캐싱 전략, WebSocket 구독 관리자(LRU), Quota 관리 로직, API 제한 대응** | **MadCamp02** |
 | **2.7.7** | **2026-01-19** | **EODHD 무료 구독 제한(최근 1년) 주의사항 추가, 외부 API 확장 전략(Phase 9) 추가** | **MadCamp02** |
 | **2.7.8** | **2026-01-19** | **지수 조회를 ETF로 변경 (Finnhub Quote API는 지수 심볼 미지원) - SPY, QQQ, DIA 사용** | **MadCamp02** |
+| **2.7.9** | **2026-01-19** | **Phase 4: Trade/Portfolio Engine 완전 구현 및 문서 통합 (트랜잭션/락 전략, 다이어그램 포함)** | **MadCamp02** |
+| **2.7.10** | **2026-01-19** | **Phase 5: Game/Shop/Ranking API 구현 완료 (가챠/인벤토리/장착/랭킹)** | **MadCamp02** |
+| **2.7.11** | **2026-01-19** | **프론트 2.7.11 스냅샷 반영, Phase 5 완료 상태 기반 “Phase 5.5: 프론트 연동·DB 제약 보강” 계획 추가(Shop/Gacha/Inventory/Ranking 실데이터 전환, `{items:[]}`·카테고리/ETF/STOMP 정합성 고정)** | **MadCamp02** |
+| **2.7.12** | **2026-01-19** | **Phase 5.5 실행: Game/Shop/Inventory/Ranking 에러 코드·DB 제약·프론트 연동 가이드 최종 반영(GAME_001~003, items.category CHECK, is_ranking_joined 필터 검증)** | **MadCamp02** |
+| **2.7.13** | **2026-01-19** | **Phase 6 실행: Finnhub Trades WebSocket 연동 완료 - 싱글톤 클라이언트, 메시지 파싱/정규화, Redis/STOMP 브로드캐스트, destination 안전성 정책 고정** | **MadCamp02** |
+| **2.7.14** | **2026-01-19** | **Phase 4~6 구현 코드 기준 Game/Trade/Realtime(WebSocket) 정합성 재정리 및 상태 테이블/페이로드·destination 설명 보완** | **MadCamp02** |
 
 ### Ver 2.6 주요 변경 사항
 
@@ -390,8 +396,9 @@ MadCamp02는 다양한 클라이언트 환경(Web, Mobile, External)을 지원�
 | **Auth**   | 100%   | ✅ Complete    | Hybrid 인증 인터페이스(Backend/Frontend Driven) 확정. 프론트 `/oauth/callback` 및 토큰 저장/갱신 연동은 Phase 1에서 진행. |
 | **User**   | 80%    | ⚠️ Update Req  | 기본 엔티티 존재하나 `is_public` 등 신규 필드 누락됨.                                                                     |
 | **Market** | 0%     | ⬜ Pending     | Controller/Service 미구현.                                                                                                |
-| **Trade**  | 10%    | 🚧 In Progress | 엔티티(`TradeLog`) 존재, 로직 미구현.                                                                                     |
-| **Game**   | 20%    | ⚠️ Update Req  | `Item` 엔티티 존재하나 Category Enum(`NAMEPLATE` 등) 업데이트 필요.                                                       |
+| **Trade**  | 100%   | ✅ Complete    | Phase 4: Trade/Portfolio Engine 완전 구현(트랜잭션/비관적 락, 동시성 테스트 포함).                                         |
+| **Game**   | 100%   | ✅ Complete    | Phase 5 구현 완료(Shop/Gacha/Inventory/Ranking). 프론트는 현재 모의데이터 상태이므로 Phase 5.5에서 실데이터 연동 필요.    |
+| **Realtime**| 90%   | 🚧 In Progress | Phase 5.6(구독 관리자) + Phase 6(Finnhub Trades WebSocket/Redis/STOMP 브로드캐스트) 구현 완료. `/topic/stock.indices`, `/user/queue/trade`는 향후 구현. |
 | **AI**     | 0%     | ⬜ Pending     | FastAPI 연동 미구현.                                                                                                      |
 
 ---
@@ -524,6 +531,169 @@ MadCamp02는 다양한 클라이언트 환경(Web, Mobile, External)을 지원�
   - `GET /api/v1/trade/history`
 - **무결성**: 동시 요청 대비 트랜잭션/락 전략을 명확히 하고(명세서의 흐름 그대로) 테스트로 고정
 
+#### 12.5.1 Phase 4 상세 설계
+
+**트랜잭션 및 락 전략**:
+
+- **비관적 락 (Pessimistic Lock) 사용**
+  - `WalletRepository.findByUserIdWithLock()`: Wallet 조회 시 락 획득
+  - `PortfolioRepository.findByUserIdAndTickerWithLock()`: Portfolio 조회 시 락 획득
+  - 락 범위: 트랜잭션 시작 시점부터 커밋까지 유지
+
+- **트랜잭션 격리 수준**
+  - 기본값: `READ_COMMITTED` (PostgreSQL 기본값)
+  - 락 타임아웃: 5초 (기본값, 필요 시 조정)
+
+- **트랜잭션 범위**
+  - `@Transactional` 어노테이션으로 전체 거래를 하나의 트랜잭션으로 처리
+  - ✅ **외부 API 호출(`StockService.getQuote()`)은 트랜잭션 외부에서 호출됨**
+    - `executeOrder()`: 외부 API 호출 (트랜잭션 없음)
+    - `executeOrderInTransaction()`: 실제 거래 로직 (트랜잭션 내부)
+    - 외부 API 지연 시에도 트랜잭션 유지 시간을 최소화하여 성능 개선
+  - ✅ **Self-invocation 문제 해결**: Spring AOP 프록시 동작을 위해 자기 주입(Self-injection) 패턴 사용
+    - `TradeService`에 `@Autowired @Lazy private TradeService self` 주입
+    - `executeOrder()`에서 `self.executeOrderInTransaction()` 호출로 프록시를 경유하여 트랜잭션 적용
+    - `executeOrderInTransaction()`은 `public`으로 변경 (프록시 호출 가능하도록)
+    - 보안: Controller에 매핑되지 않아 외부 HTTP 요청으로는 접근 불가능
+
+**거래 실행 흐름 다이어그램**:
+
+매수 주문 흐름:
+
+```mermaid
+sequenceDiagram
+    participant C as Controller
+    participant TS as TradeService
+    participant WR as WalletRepository
+    participant PR as PortfolioRepository
+    participant SSR as StockService
+    participant TLR as TradeLogRepository
+    
+    C->>TS: executeOrder(userId, request)
+    activate TS
+    
+    TS->>SSR: getQuote(ticker)
+    Note over TS,SSR: 트랜잭션 외부에서 호출
+    SSR-->>TS: currentPrice
+    
+    TS->>TS: executeOrderInTransaction()
+    Note over TS: @Transactional 시작
+    
+    TS->>WR: findByUserIdWithLock(userId)
+    WR-->>TS: Wallet (락 획득)
+    
+    TS->>TS: 잔고 확인
+    alt 잔고 부족
+        TS-->>C: TradeException(INSUFFICIENT_BALANCE)
+    end
+    
+    TS->>PR: findByUserIdAndTickerWithLock(userId, ticker)
+    PR-->>TS: Portfolio or Empty (락 획득)
+    
+    TS->>TS: Wallet.deductCash()
+    TS->>TS: Portfolio.addQuantity() or 생성
+    
+    TS->>TLR: save(TradeLog)
+    TS->>WR: save(Wallet)
+    TS->>PR: save(Portfolio)
+    
+    Note over TS: 트랜잭션 커밋 (락 해제)
+    TS-->>C: TradeResponse
+    deactivate TS
+```
+
+매도 주문 흐름:
+
+```mermaid
+sequenceDiagram
+    participant C as Controller
+    participant TS as TradeService
+    participant WR as WalletRepository
+    participant PR as PortfolioRepository
+    participant SSR as StockService
+    participant TLR as TradeLogRepository
+    
+    C->>TS: executeOrder(userId, request)
+    activate TS
+    
+    TS->>SSR: getQuote(ticker)
+    Note over TS,SSR: 트랜잭션 외부에서 호출
+    SSR-->>TS: currentPrice
+    
+    TS->>TS: executeOrderInTransaction()
+    Note over TS: @Transactional 시작
+    
+    TS->>WR: findByUserIdWithLock(userId)
+    WR-->>TS: Wallet (락 획득)
+    
+    TS->>TS: executeSellOrder 호출
+    
+    TS->>PR: findByUserIdAndTickerWithLock(userId, ticker)
+    PR-->>TS: Portfolio (락 획득)
+    
+    alt 보유 수량 없음
+        TS-->>C: TradeException(INSUFFICIENT_QUANTITY)
+    end
+    
+    TS->>TS: 보유 수량 확인
+    alt 수량 부족
+        TS-->>C: TradeException(INSUFFICIENT_QUANTITY)
+    end
+    
+    TS->>TS: 실현 손익 계산
+    TS->>TS: Portfolio.subtractQuantity()
+    
+    TS->>TS: Wallet.addCash()
+    TS->>TS: Wallet.addRealizedProfit()
+    
+    alt Portfolio.isEmpty()
+        TS->>PR: delete(Portfolio)
+    end
+    
+    TS->>TLR: save(TradeLog with realizedPnl)
+    TS->>WR: save(Wallet)
+    TS->>PR: save(Portfolio) or delete
+    
+    Note over TS: 트랜잭션 커밋 (락 해제)
+    TS-->>C: TradeResponse
+    deactivate TS
+```
+
+**동시성 문제 해결 방안**:
+
+1. **동시 매수 주문**: 비관적 락으로 Wallet 조회 시 락 획득, 한 번에 하나의 거래만 실행
+2. **동시 매도 주문**: 비관적 락으로 Portfolio 조회 시 락 획득, 한 번에 하나의 거래만 실행
+3. **매수/매도 동시 실행**: 비관적 락으로 Portfolio와 Wallet 모두 락 획득, 순차 실행
+
+**Service 구현 상세**:
+
+- **TradeService**
+  - `executeOrder()`: 거래 주문 실행 (외부 API 호출, 트랜잭션 외부)
+  - `executeOrderInTransaction()`: 트랜잭션 내부에서 거래 실행 (비관적 락 포함)
+  - `executeBuyOrder()`: 매수 주문 실행 (잔고 확인, Portfolio 생성/업데이트, 평단가 재계산)
+  - `executeSellOrder()`: 매도 주문 실행 (수량 확인, 실현 손익 계산, Portfolio 삭제)
+  - `getTradeHistory()`: 거래 내역 조회 (페이징, 기간 필터링 지원)
+
+- **PortfolioService**
+  - `getPortfolio()`: 포트폴리오 조회 및 평가 (현재가 조회, 손익률 계산, 현재가 조회 실패 시 처리)
+
+- **WalletService**
+  - `getAvailableBalance()`: 매수 가능 금액 조회
+
+**테스트 전략**:
+
+- **단위 테스트**: 잔고 부족, 수량 부족 시나리오
+- **통합 테스트**: 전체 거래 흐름 검증
+- **동시성 테스트**: 동시 매수/매도 주문 시나리오 (락 동작 확인)
+- **트랜잭션 검증 테스트**: 
+  - 트랜잭션 롤백 확인 (`TradeServiceTransactionTest.testTransactionRollbackOnException`)
+  - 트랜잭션 커밋 확인 (`TradeServiceTransactionTest.testTransactionCommitOnSuccess`)
+  - 외부 API 호출이 트랜잭션 외부에서 수행되는지 확인
+  - 비관적 락 동작 확인 (`TradeServiceTransactionTest.testPessimisticLockSequentialProcessing`)
+  - 테스트 클래스 레벨 `@Transactional` 제거 (동시성 테스트를 위해)
+  - 스레드 안전한 리스트 사용 (`Collections.synchronizedList()`)
+  - `StockService` 모킹 (`@MockBean`)으로 외부 API 호출 변수 제거
+
 ### 12.6 Phase 5: Shop/Game/Ranking (프론트 `/shop`, `/mypage`, `/ranking`)
 
 - **구현 대상**: `GameController`, `GachaService`, `InventoryService`, `RankingService`
@@ -534,7 +704,22 @@ MadCamp02는 다양한 클라이언트 환경(Web, Mobile, External)을 지원�
   - `PUT /api/v1/game/equip/{itemId}`
   - `GET /api/v1/game/ranking` (랭킹 참여 토글 반영)
 
-### 12.6.1 Phase 5.5: WebSocket 구독 관리자 구현 (DATA_STRATEGY_PLAN 기반)
+### 12.6.1 Phase 5.5: 프론트 연동·DB 보강 (Shop/Gacha/Inventory/Ranking)
+
+- **목표**: Phase 5에서 구현된 Game/Shop/Ranking API를 프론트 2.7.11 실제 화면에 연결하고, DB/응답 제약을 단단히 고정
+- **연동 체크리스트 (프론트 상태: 전면 Mock → 실데이터 전환)**:
+  - `/api/v1/game/items` → 상점 목록/확률 카드 (카테고리 `NAMEPLATE|AVATAR|THEME` 고정, `{ items: [...] }` 패턴)
+  - `/api/v1/game/gacha` → 가챠 결과/코인 차감 UI (중복 시 재추첨 실패 코드 `GAME_002` 대응)
+  - `/api/v1/game/inventory` + `/api/v1/game/equip/{itemId}` → 인벤토리/장착 단일성 보장 UI
+  - `/api/v1/game/ranking` → 랭킹/참여 토글 연동 (`is_ranking_joined` 반영)
+- **DB/제약 보강**:
+  - `items.category`는 Flyway V3에서 레거시 매핑 + `CHECK (category IN ('NAMEPLATE','AVATAR','THEME'))` 제약까지 이미 적용되어 있으며, Unknown 값 존재 시 마이그레이션이 실패하도록 고정됨
+  - 응답 DTO는 `FULL_SPECIFICATION` 5.0/5.5 기준의 `items` 래퍼와(필요 시) `asOf` 필드를 유지해 프론트 연동 시 호환성 보장
+- **실시간/지표 정합성**:
+  - STOMP 엔드포인트 `/ws-stomp` 재확인(프론트 문서와 동일)
+  - 지수 데이터는 ETF(SPY/QQQ/DIA) 사용 문구를 프론트/스펙과 일치시켜 통신/캐싱 정책 혼선 제거
+
+### 12.6.2 Phase 5.6: WebSocket 구독 관리자 구현 (DATA_STRATEGY_PLAN 기반)
 
 - **구현 대상**: `StockSubscriptionManager` (Thread-safe)
 - **기능**:
@@ -543,13 +728,28 @@ MadCamp02는 다양한 클라이언트 환경(Web, Mobile, External)을 지원�
   - LRU 기반 자동 해제: 50개 초과 시 가장 오래된 비활성 종목 해제
 - **이벤트 훅**: STOMP Subscribe/Unsubscribe 이벤트(`@EventListener`)에서 Manager 호출
 
-### 12.7 Phase 6: 실시간(STOMP) + 알림(선택/후순위)
+### 12.7 Phase 6: 실시간(STOMP) + Finnhub WebSocket 연동 (구현 완료)
 
-- **구현 대상**: `WebSocketConfig`, Stock broadcast/Trade notification handler
-- **토픽(프론트 문서 기준)**:
-  - `/topic/stock.indices`
-  - `/topic/stock.ticker.{ticker}`
-  - `/user/queue/trade`
+**구현 일자**: 2026-01-19
+
+**구현 내용**:
+- ✅ `FinnhubTradesWebSocketClient`: Finnhub Trades WebSocket 싱글톤 클라이언트 구현
+  - API 키당 1개 연결 보장
+  - 지수 백오프 재연결 전략
+  - 구독 버퍼링 및 재구독 지원 (active/pending 구독 세트 관리)
+- ✅ `TradePriceBroadcastService`: Trade 메시지 정규화 및 브로드캐스트 서비스
+  - Redis 캐시 업데이트 (`stock:price:{ticker}`, TTL 24시간)
+  - STOMP 브로드캐스트 (`/topic/stock.ticker.{ticker}`)
+  - Payload 스키마: `ticker`, `price`, `ts`, `volume`, `source="FINNHUB"`, `rawType="trade"`, `conditions[]` (volume=0인 price update도 허용)
+- ✅ `FinnhubClient.subscribe/unsubscribe`: 실제 WebSocket 메시지 전송으로 연결
+- ✅ `StompDestinationUtils`: STOMP destination 생성/파싱 유틸리티 (`/topic/stock.ticker.{ticker}` 생성, 공백/콜론 포함 ticker 지원)
+- ✅ 메시지 파싱: 다건 trade, `v=0` 업데이트, 예외 처리
+- ✅ 테스트: 단위 테스트 및 통합 테스트 작성
+
+**토픽(프론트 문서 기준)**:
+- `/topic/stock.indices` (향후 구현)
+- `/topic/stock.ticker.{ticker}` (구현 완료)
+- `/user/queue/trade` (향후 구현)
 
 ### 12.8 Phase 7: AI(SSE) 연동 (프론트 `/oracle`)
 
@@ -662,5 +862,94 @@ MadCamp02는 다양한 클라이언트 환경(Web, Mobile, External)을 지원�
 
 ---
 
-**문서 버전:** 2.7.8 (지수 조회 ETF 변경 반영)  
+## 13.2 Phase 4 구현 완료 현황 (Trade/Portfolio Engine)
+
+**구현 일자**: 2026-01-19
+
+**구현 내용**:
+- ✅ DTO 생성: TradeOrderRequest, AvailableBalanceResponse, TradeResponse, TradeHistoryResponse
+- ✅ WalletService 구현: getAvailableBalance 메서드
+- ✅ PortfolioService 구현: getPortfolio 메서드 (현재가 조회 및 평가 로직 포함)
+- ✅ TradeService 구현: executeOrder, executeBuyOrder, executeSellOrder, getTradeHistory 메서드
+- ✅ TradeController 구현: 4개 엔드포인트 (available-balance, order, portfolio, history)
+- ✅ 트랜잭션 및 비관적 락 전략 구현
+- ✅ 동시성 테스트 및 통합 테스트 작성
+
+**검증 완료**:
+- ✅ 비관적 락 동작 확인: WalletRepository.findByUserIdWithLock(), PortfolioRepository.findByUserIdAndTickerWithLock()
+- ✅ 트랜잭션 범위 확인: @Transactional 어노테이션 적용
+- ✅ 동시성 제어 확인: 동시 매수/매도 주문 시나리오 테스트
+- ✅ 실현 손익 계산: 매도 시 평단가 기준 실현 손익 자동 계산
+- ✅ 포트폴리오 평가: 현재가 조회 및 손익률 계산
+- ✅ 예외 처리: TradeException 및 ErrorCode 매핑
+
+**참고사항**:
+- ✅ 외부 API 호출(`StockService.getQuote()`)은 트랜잭션 외부에서 호출됨 (성능 개선 완료)
+- 포트폴리오 조회 시 현재가 조회 실패 시에도 기본 정보는 포함하여 반환
+
+**트랜잭션 동작 검증**:
+
+구현된 코드가 계획서의 트랜잭션/락 전략을 정확히 따르는지 확인:
+
+1. ✅ **@Transactional 적용**: `executeOrderInTransaction()` 메서드에 `@Transactional` 어노테이션 적용
+   - `executeOrder()`: 외부 API 호출만 수행 (트랜잭션 없음)
+   - `executeOrderInTransaction()`: 실제 거래 로직 수행 (트랜잭션 내부)
+2. ✅ **비관적 락 사용**: 
+   - `WalletRepository.findByUserIdWithLock()` 사용 (PESSIMISTIC_WRITE)
+   - `PortfolioRepository.findByUserIdAndTickerWithLock()` 사용 (PESSIMISTIC_WRITE)
+3. ✅ **락 획득 순서**:
+   - **외부 API 호출** (트랜잭션 외부): 현재가 조회 (`StockService.getQuote()`)
+   - **트랜잭션 시작**: `executeOrderInTransaction()` 호출
+   - **매수 주문**: Wallet 락 → Portfolio 락 (또는 생성)
+   - **매도 주문**: Wallet 락 → Portfolio 락
+   - 실제 구현은 외부 API 호출을 먼저 수행하여 트랜잭션 유지 시간을 최소화
+4. ✅ **트랜잭션 범위**: 전체 거래 로직이 하나의 트랜잭션으로 처리
+5. ✅ **외부 API 호출**: `StockService.getQuote()`가 트랜잭션 외부에서 호출됨
+   - `executeOrder()`: 외부 API 호출 (트랜잭션 없음)
+   - `executeOrderInTransaction()`: 실제 거래 로직 (트랜잭션 내부)
+   - 외부 API 지연 시에도 트랜잭션 유지 시간을 최소화하여 성능 개선 완료
+6. ✅ **다이어그램 일치**: 문서 다이어그램이 실제 구현 순서와 일치하도록 업데이트 완료
+
+**동시성 테스트 결과**:
+
+- 동시 매수 주문: 비관적 락으로 인해 한 번에 하나의 거래만 실행됨 (잔고 초과 방지)
+- 동시 매도 주문: 비관적 락으로 인해 한 번에 하나의 거래만 실행됨 (수량 초과 방지)
+- 매수/매도 동시 실행: Portfolio와 Wallet 모두 락 획득으로 순차 실행 보장
+
+**트러블슈팅 및 해결**:
+
+- ✅ **Self-invocation 문제 해결**: `this.executeOrderInTransaction()` 호출 시 트랜잭션이 적용되지 않는 문제를 자기 주입 패턴으로 해결
+- ✅ **테스트 코드 리팩토링**: 
+  - 테스트 클래스 레벨 `@Transactional` 제거 (동시성 테스트를 위해)
+  - `@AfterEach`에서 수동 데이터 정리로 데이터 격리 보장
+  - 스레드 안전한 리스트 사용 (`Collections.synchronizedList()`)
+  - `StockService` 모킹으로 외부 API 호출 변수 제거
+- ✅ **트랜잭션 격리 문제 해결**: 별도 스레드에서 테스트 데이터를 볼 수 없는 문제를 트랜잭션 제거 및 수동 데이터 정리로 해결
+
+---
+
+**문서 버전:** 2.7.13 (Phase 6: Finnhub WebSocket 연동 완료)  
 **최종 수정일:** 2026-01-19
+
+---
+
+## 13.3 Phase 5 구현 완료 현황 (Game/Shop/Ranking)
+
+**구현 일자**: 2026-01-19
+
+**구현 내용**:
+- ✅ `GameController` 신규 추가: `/items`, `/gacha`, `/inventory`, `/equip/{itemId}`, `/ranking`
+- ✅ `ItemsResponse`, `GachaResponse` DTO 추가 (`items` 패턴, asOf 포함)
+- ✅ `InventoryResponse`, `RankingResponse` DTO를 `FULL_SPECIFICATION` 5.5 스키마와 정합하게 정리(asOf/ items / my 구조 유지)
+- ✅ `GachaService` 구현: 게임 코인 100 차감 → 확률 기반 추첨 → 중복 시 재추첨(최대 10회) → 인벤토리 지급
+- ✅ `InventoryService` 구현: 카테고리 단일 장착 보장(기존 장착 자동 해제) + 인벤토리 조회
+- ✅ `RankingService` 구현: 랭킹 참여 사용자만 대상으로 총자산 내림차순 Top 50, 수익률 = (총자산-초기자산)/초기자산*100
+- ✅ `WalletRepository.findRankingWallets(Pageable)` 추가 (is_ranking_joined 필터)
+- ✅ 단위 테스트: 카테고리 검증, 장착 단일성, 랭킹 수익률 계산 검증
+
+**참고사항**:
+- 가챠 비용 기본값: 100 게임 코인 (`GachaService.GACHA_COST`)
+- 중복 아이템만 존재할 경우 `GAME_002` 발생
+- 응답 스키마는 `FULL_SPECIFICATION` 5.5와 정합
+
+---

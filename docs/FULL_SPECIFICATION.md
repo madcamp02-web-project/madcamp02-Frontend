@@ -1,6 +1,6 @@
 # 📁 MadCamp02: 최종 통합 명세서
 
-**Ver 2.7.8 - Complete Edition (Spec-Driven Alignment)**
+**Ver 2.7.13 - Complete Edition (Spec-Driven Alignment)**
 
 ---
 
@@ -25,6 +25,11 @@
 | **2.7.6** | **2026-01-19** | **데이터 전략 반영: EODHD + DB 캐싱, WebSocket 구독 관리(LRU), API 제한 및 에러 처리 명시**         | **MadCamp02** |
 | **2.7.7** | **2026-01-19** | **EODHD 무료 구독 제한(최근 1년) 주의사항 추가, 외부 API 확장 전략(13.3) 추가** | **MadCamp02** |
 | **2.7.8** | **2026-01-19** | **지수 조회를 ETF로 변경 (Finnhub Quote API는 지수 심볼 미지원) - SPY, QQQ, DIA 사용** | **MadCamp02** |
+| **2.7.9** | **2026-01-19** | **Phase 4: Trade/Portfolio Engine 완전 구현 및 문서 통합 (트랜잭션/락 전략, 다이어그램 포함)** | **MadCamp02** |
+| **2.7.10** | **2026-01-19** | **Phase 5: Game/Shop/Ranking API 구현 완료 (가챠/인벤토리/장착/랭킹)** | **MadCamp02** |
+| **2.7.11** | **2026-01-19** | **프론트 2.7.11 스냅샷 반영: Phase 5 완료 기반 “Phase 5.5: 프론트 연동·DB 제약 보강” 추가(Shop/Gacha/Inventory/Ranking 실데이터 전환 체크리스트, `{items:[]}`·카테고리/ETF/STOMP 정합성 재확인)** | **MadCamp02** |
+| **2.7.12** | **2026-01-19** | **Phase 5.5 실행: `/api/v1/game/*` 응답 DTO/에러 코드(GAME_001~003)·items.category CHECK 제약·랭킹 필터(is_ranking_joined) 구현 상태를 스펙과 최종 정합화** | **MadCamp02** |
+| **2.7.13** | **2026-01-19** | **Phase 6: 실시간 통신(10장) 추가 - STOMP 토픽/payload 스키마, Finnhub WebSocket 제약사항, ticker destination 안전성 정책 고정 (FinnhubTradesWebSocketClient/TradePriceBroadcastService/StompDestinationUtils 기준)** | **MadCamp02** |
 
 ### Ver 2.6 주요 변경 사항
 
@@ -541,6 +546,271 @@ _(나머지 테이블 `wallet`, `portfolio`, `trade_logs`, `inventory`, `watchli
 | GET    | `/api/v1/trade/portfolio`         | 보유 종목 및 수익률 조회 |
 | GET    | `/api/v1/trade/history`           | 거래 내역 조회           |
 
+#### 5.4.1 거래 실행 흐름
+
+거래 주문은 비관적 락(Pessimistic Lock)을 사용하여 동시성 문제를 해결합니다.
+
+**매수 주문 흐름**:
+
+```mermaid
+sequenceDiagram
+    participant C as Controller
+    participant TS as TradeService
+    participant WR as WalletRepository
+    participant PR as PortfolioRepository
+    participant SSR as StockService
+    participant TLR as TradeLogRepository
+    
+    C->>TS: executeOrder(userId, request)
+    activate TS
+    
+    TS->>SSR: getQuote(ticker)
+    Note over TS,SSR: 트랜잭션 외부에서 호출
+    SSR-->>TS: currentPrice
+    
+    TS->>TS: executeOrderInTransaction()
+    Note over TS: @Transactional 시작
+    
+    TS->>WR: findByUserIdWithLock(userId)
+    WR-->>TS: Wallet (락 획득)
+    
+    TS->>TS: 잔고 확인
+    alt 잔고 부족
+        TS-->>C: TradeException(INSUFFICIENT_BALANCE)
+    end
+    
+    TS->>PR: findByUserIdAndTickerWithLock(userId, ticker)
+    PR-->>TS: Portfolio or Empty (락 획득)
+    
+    TS->>TS: Wallet.deductCash()
+    TS->>TS: Portfolio.addQuantity() or 생성
+    
+    TS->>TLR: save(TradeLog)
+    TS->>WR: save(Wallet)
+    TS->>PR: save(Portfolio)
+    
+    Note over TS: 트랜잭션 커밋 (락 해제)
+    TS-->>C: TradeResponse
+    deactivate TS
+```
+
+**매도 주문 흐름**:
+
+```mermaid
+sequenceDiagram
+    participant C as Controller
+    participant TS as TradeService
+    participant WR as WalletRepository
+    participant PR as PortfolioRepository
+    participant SSR as StockService
+    participant TLR as TradeLogRepository
+    
+    C->>TS: executeOrder(userId, request)
+    activate TS
+    
+    TS->>SSR: getQuote(ticker)
+    Note over TS,SSR: 트랜잭션 외부에서 호출
+    SSR-->>TS: currentPrice
+    
+    TS->>TS: executeOrderInTransaction()
+    Note over TS: @Transactional 시작
+    
+    TS->>WR: findByUserIdWithLock(userId)
+    WR-->>TS: Wallet (락 획득)
+    
+    TS->>TS: executeSellOrder 호출
+    
+    TS->>PR: findByUserIdAndTickerWithLock(userId, ticker)
+    PR-->>TS: Portfolio (락 획득)
+    
+    alt 보유 수량 없음
+        TS-->>C: TradeException(INSUFFICIENT_QUANTITY)
+    end
+    
+    TS->>TS: 보유 수량 확인
+    alt 수량 부족
+        TS-->>C: TradeException(INSUFFICIENT_QUANTITY)
+    end
+    
+    TS->>TS: 실현 손익 계산
+    TS->>TS: Portfolio.subtractQuantity()
+    
+    TS->>TS: Wallet.addCash()
+    TS->>TS: Wallet.addRealizedProfit()
+    
+    alt Portfolio.isEmpty()
+        TS->>PR: delete(Portfolio)
+    end
+    
+    TS->>TLR: save(TradeLog with realizedPnl)
+    TS->>WR: save(Wallet)
+    TS->>PR: save(Portfolio) or delete
+    
+    Note over TS: 트랜잭션 커밋 (락 해제)
+    TS-->>C: TradeResponse
+    deactivate TS
+```
+
+#### 5.4.2 동시성 제어
+
+**동시성 문제 시나리오**:
+
+1. **시나리오 1: 동시 매수 주문**
+   - 사용자 A가 동시에 2개의 매수 주문을 보냄
+   - 잔고가 1개 주문만 가능한 경우
+   - **문제**: 두 주문 모두 잔고 확인 통과 후 실행되어 잔고 초과
+   - **해결**: 비관적 락으로 Wallet 조회 시 락 획득, 한 번에 하나의 거래만 실행
+
+2. **시나리오 2: 동시 매도 주문**
+   - 사용자 A가 동시에 2개의 매도 주문을 보냄
+   - 보유 수량이 1개 주문만 가능한 경우
+   - **문제**: 두 주문 모두 수량 확인 통과 후 실행되어 수량 초과
+   - **해결**: 비관적 락으로 Portfolio 조회 시 락 획득, 한 번에 하나의 거래만 실행
+
+3. **시나리오 3: 매수/매도 동시 실행**
+   - 사용자 A가 매수 주문과 매도 주문을 동시에 보냄
+   - **문제**: 포트폴리오 업데이트 시 경쟁 조건 발생
+   - **해결**: 비관적 락으로 Portfolio와 Wallet 모두 락 획득, 순차 실행
+
+**락 전략**:
+
+- **비관적 락 (Pessimistic Lock) 사용**
+  - `WalletRepository.findByUserIdWithLock()`: Wallet 조회 시 락 획득
+  - `PortfolioRepository.findByUserIdAndTickerWithLock()`: Portfolio 조회 시 락 획득
+  - 락 범위: 트랜잭션 시작 시점부터 커밋까지 유지
+
+- **트랜잭션 격리 수준**
+  - 기본값: `READ_COMMITTED` (PostgreSQL 기본값)
+  - 락 타임아웃: 5초 (기본값, 필요 시 조정)
+
+- **트랜잭션 범위**
+  - `@Transactional` 어노테이션으로 전체 거래를 하나의 트랜잭션으로 처리
+  - ✅ **외부 API 호출(`StockService.getQuote()`)은 트랜잭션 외부에서 호출됨**
+    - `executeOrder()`: 외부 API 호출 (트랜잭션 없음)
+    - `executeOrderInTransaction()`: 실제 거래 로직 (트랜잭션 내부)
+    - 외부 API 지연 시에도 트랜잭션 유지 시간을 최소화하여 성능 개선 완료
+  - ✅ **Self-invocation 문제 해결**: Spring AOP 프록시 동작을 위해 자기 주입(Self-injection) 패턴 사용
+    - `TradeService`에 `@Autowired @Lazy private TradeService self` 주입
+    - `executeOrder()`에서 `self.executeOrderInTransaction()` 호출로 프록시를 경유하여 트랜잭션 적용
+    - `executeOrderInTransaction()`은 `public`으로 변경 (프록시 호출 가능하도록)
+    - 보안: Controller에 매핑되지 않아 외부 HTTP 요청으로는 접근 불가능
+
+#### 5.4.3 Request/Response DTO 상세
+
+**TradeOrderRequest** (POST `/api/v1/trade/order`):
+
+```json
+{
+  "ticker": "AAPL",
+  "type": "BUY",
+  "quantity": 10
+}
+```
+
+- `ticker` (String, 필수): 종목 코드 (예: "AAPL")
+- `type` (String, 필수): 거래 타입 ("BUY" 또는 "SELL")
+- `quantity` (Integer, 필수, 최소값: 1): 주문 수량
+
+**AvailableBalanceResponse** (GET `/api/v1/trade/available-balance`):
+
+```json
+{
+  "availableBalance": 10000.0,
+  "cashBalance": 10000.0,
+  "currency": "USD"
+}
+```
+
+**TradeResponse** (POST `/api/v1/trade/order`):
+
+```json
+{
+  "orderId": 12345,
+  "ticker": "AAPL",
+  "type": "BUY",
+  "quantity": 10,
+  "executedPrice": 195.12,
+  "totalAmount": 1951.2,
+  "executedAt": "2026-01-19T12:00:00"
+}
+```
+
+**TradeHistoryResponse** (GET `/api/v1/trade/history`):
+
+```json
+{
+  "asOf": "2026-01-19T12:00:00",
+  "items": [
+    {
+      "logId": 12345,
+      "ticker": "AAPL",
+      "type": "BUY",
+      "quantity": 10,
+      "price": 195.12,
+      "totalAmount": 1951.2,
+      "realizedPnl": null,
+      "tradeDate": "2026-01-19T12:00:00"
+    },
+    {
+      "logId": 12346,
+      "ticker": "AAPL",
+      "type": "SELL",
+      "quantity": 5,
+      "price": 200.00,
+      "totalAmount": 1000.0,
+      "realizedPnl": 24.4,
+      "tradeDate": "2026-01-19T13:00:00"
+    }
+  ]
+}
+```
+
+**PortfolioResponse** (GET `/api/v1/trade/portfolio`):
+
+```json
+{
+  "asOf": "2026-01-19T12:00:00",
+  "summary": {
+    "totalEquity": 10500.0,
+    "cashBalance": 2500.0,
+    "totalPnl": 500.0,
+    "totalPnlPercent": 5.0,
+    "currency": "USD"
+  },
+  "positions": [
+    {
+      "ticker": "AAPL",
+      "quantity": 10,
+      "avgPrice": 180.0,
+      "currentPrice": 195.12,
+      "marketValue": 1951.2,
+      "pnl": 151.2,
+      "pnlPercent": 8.4
+    }
+  ]
+}
+```
+
+#### 5.4.4 예외 처리
+
+| 에러 코드 | HTTP 상태 | 설명 | 프론트엔드 처리 가이드 |
+| --------- | --------- | ---- | ---------------------- |
+| `TRADE_001` | 400 | 잔고 부족 | "잔고가 부족합니다" 토스트 메시지 표시 |
+| `TRADE_002` | 400 | 보유 수량 부족 | "보유 수량이 부족합니다" 토스트 메시지 표시 |
+| `TRADE_003` | 400 | 거래 시간 외 | 거래 불가 안내 모달 (향후 구현) |
+| `TRADE_004` | 400 | 유효하지 않은 종목 | 종목 검색으로 유도 |
+
+**에러 응답 예시**:
+
+```json
+{
+  "timestamp": "2026-01-19T12:00:00",
+  "status": 400,
+  "error": "TRADE_001",
+  "message": "잔고가 부족합니다."
+}
+```
+
 ### 5.5 상점/게임 API (`/api/v1/game`) 🆕
 
 | Method | Endpoint          | 설명                               |
@@ -550,6 +820,48 @@ _(나머지 테이블 `wallet`, `portfolio`, `trade_logs`, `inventory`, `watchli
 | GET    | `/inventory`      | 내 인벤토리 조회                   |
 | PUT    | `/equip/{itemId}` | 아이템 장착/해제 토글              |
 | GET    | `/ranking`        | 유저 랭킹 조회                     |
+
+#### 5.5.1 Items (`GET /api/v1/game/items`)
+- Query: `category`(optional, NAMEPLATE|AVATAR|THEME)
+- Response: `{ asOf, items: [{ itemId, name, category, rarity, probability, imageUrl, description }] }`
+
+#### 5.5.2 Gacha (`POST /api/v1/game/gacha`)
+- 비용: 100 게임 코인 차감 (`wallet.game_coin`)
+- 동작: 확률 기반 추첨 → 이미 보유한 아이템이면 최대 10회 재추첨 → 모두 중복이면 `GAME_002`
+- Response: `{ itemId, name, category, rarity, imageUrl, remainingCoin }`
+- 에러:
+  - `GAME_001` 코인 부족
+  - `GAME_003` 가챠 대상 아이템 없음
+  - `GAME_002` 재추첨 실패(모두 중복)
+
+#### 5.5.3 Inventory (`GET /api/v1/game/inventory`)
+- Response 예시 상단 E) 참고 (`items` 배열, equipped 포함)
+
+#### 5.5.4 Equip Toggle (`PUT /api/v1/game/equip/{itemId}`)
+- 카테고리별 단일 장착 보장: 같은 카테고리에 다른 아이템이 장착되어 있으면 자동 해제 후 토글
+- Response: 인벤토리 전체(동일 스키마)
+- 에러: `GAME_003` 아이템 미보유
+
+#### 5.5.5 Ranking (`GET /api/v1/game/ranking`)
+- 대상: `is_ranking_joined = true` 사용자
+- 정렬: 총자산(`wallet.total_assets`) 내림차순, 최대 50명
+- 수익률 계산: `(totalAssets - 10000) / 10000 * 100`
+- Response 예시 상단 F) 참고 (`asOf`, `items`, `my`)
+
+### 5.6 Phase 5.5: 프론트 연동·DB 제약 보강 (Shop/Gacha/Inventory/Ranking)
+
+- **프론트 현재 상태(Ver 2.7.11)**: `/shop`·`/gacha`·`/ranking`·`/mypage`는 모의데이터/상수 기반으로 렌더링되며 Axios/STOMP/SSE 미연결.
+- **실데이터 전환 체크리스트**:
+  - `/api/v1/game/items` → 상점/확률 카드: `{ "items": [...] }` 패턴, 카테고리 `NAMEPLATE|AVATAR|THEME`만 허용
+  - `/api/v1/game/gacha` → 가챠 실행: 중복만 존재 시 `GAME_002` 처리, 코인 차감/결과 UI 동기화
+  - `/api/v1/game/inventory`, `/api/v1/game/equip/{itemId}` → 인벤토리 조회·장착 단일성 반영(기존 장착 자동 해제)
+  - `/api/v1/game/ranking` → 랭킹/참여 토글: `is_ranking_joined` 필터 적용 상태 유지
+- **DB/제약 재확인**:
+  - `items.category`는 Flyway V3 기준 `NAMEPLATE/AVATAR/THEME` 외 값 존재 시 마이그레이션 실패(Fail Fast) + `CHECK` 제약 권장
+  - 모든 리스트 응답은 `{items:[...]}` 패턴 유지, 필요 시 `asOf` 메타 포함
+- **실시간/지표 정합성**:
+  - STOMP 엔드포인트 `/ws-stomp` 고정
+  - 지수 데이터는 ETF(SPY/QQQ/DIA) 사용 문구를 프론트/백엔드 문서 모두 동일하게 유지
 
 ---
 
@@ -623,6 +935,181 @@ MadCamp02는 유연한 연동을 위해 두 가지 인증 흐름을 모두 제�
 1.  **토큰 획득**: 프론트엔드(앱)에서 카카오 SDK 등을 통해 Access Token 직접 획득.
 2.  **로그인 요청**: 프론트엔드가 `POST /api/v1/auth/oauth/kakao` 호출 (Body: `{ "accessToken": "..." }`).
 3.  **토큰 발급**: 백엔드 검증 후 JWT 응답.
+
+---
+
+## 10. 실시간 통신
+
+### 10.1 WebSocket (STOMP) 개요
+
+MadCamp02는 **Spring WebSocket (STOMP)**를 사용하여 실시간 주가 데이터를 클라이언트에 전달합니다.
+
+**아키텍처 원칙**:
+- **서버 측**: Finnhub Trades WebSocket을 **단일 연결(API 키당 1개)**로 유지하고, 수신한 trade 메시지를 STOMP로 중계
+- **클라이언트 측**: 프론트엔드는 STOMP만 사용하며, 외부 WebSocket(Finnhub)에 직접 연결하지 않음
+- **보안**: Finnhub API 키는 서버에서만 사용하며, 프론트엔드로 노출하지 않음
+
+### 10.2 STOMP 엔드포인트 및 토픽
+
+#### 엔드포인트
+
+- **WebSocket Endpoint**: `/ws-stomp`
+- **프로토콜**: STOMP over WebSocket (SockJS fallback 지원)
+
+#### 구독 가능한 토픽
+
+| 토픽 패턴 | 설명 | 사용 시나리오 |
+|---------|------|-------------|
+| `/topic/stock.indices` | 시장 지수 업데이트 (10초 주기) | Market 페이지 (향후 구현) |
+| `/topic/stock.ticker.{ticker}` | 개별 종목 체결가/호가 (실시간) | Trade 페이지 진입 시 구독 |
+| `/user/queue/trade` | 사용자 개인 주문 체결 알림 | 전역 구독 (향후 구현) |
+
+**토픽 구독 전략**:
+- **동적 구독**: 사용자가 종목 상세 페이지(`/trade`) 진입 시에만 해당 종목 구독
+- **LRU 기반 해제**: 백엔드에서 Finnhub WebSocket 50 Symbols 제한으로 인해, 현재 아무도 보고 있지 않은 종목은 자동으로 구독 해제됨
+- **프론트엔드 동작**: 페이지 이탈 시 명시적 구독 해제(`UNSUBSCRIBE`) 권장
+
+### 10.3 STOMP 메시지 Payload 스키마
+
+#### `/topic/stock.ticker.{ticker}` Payload
+
+**스키마**:
+
+```json
+{
+  "ticker": "string",
+  "price": "number",
+  "ts": "number",
+  "volume": "number",
+  "source": "string (optional)",
+  "rawType": "string (optional)",
+  "conditions": "string[] (optional)"
+}
+```
+
+**필드 설명**:
+
+| 필드 | 타입 | 설명 |
+|-----|------|------|
+| `ticker` | string | 종목 심볼 (예: `AAPL`, `BINANCE:BTCUSDT`, `IC MARKETS:1`) |
+| `price` | number | 최신 체결가 (Last Price) |
+| `ts` | number | UNIX 타임스탬프 (밀리초) |
+| `volume` | number | 거래량 (trade 미지원 시 `0` 가능) |
+| `source` | string (optional) | 데이터 출처 (기본값: `"FINNHUB"`) |
+| `rawType` | string (optional) | Finnhub 원본 메시지 타입 (예: `"trade"`) |
+| `conditions` | string[] (optional) | 거래 조건 코드 리스트 (Finnhub `c` 필드) |
+
+**예시 JSON**:
+
+```json
+{
+  "ticker": "AAPL",
+  "price": 195.12,
+  "ts": 1705672800000,
+  "volume": 1000,
+  "source": "FINNHUB",
+  "rawType": "trade",
+  "conditions": []
+}
+```
+
+**Price Update (Trade 미지원 시)**:
+
+일부 forex/crypto 거래소에서는 trade 데이터를 제공하지 않을 수 있습니다. 이 경우 `volume=0`인 price update가 전송됩니다:
+
+```json
+{
+  "ticker": "BINANCE:BTCUSDT",
+  "price": 7296.89,
+  "ts": 1705672800000,
+  "volume": 0,
+  "source": "FINNHUB",
+  "rawType": "trade"
+}
+```
+
+### 10.4 Ticker 심볼 형식 및 Destination 안전성
+
+**지원하는 심볼 형식**:
+
+- **US 주식**: `AAPL`, `MSFT`, `GOOGL` 등
+- **Crypto**: `BINANCE:BTCUSDT`, `BINANCE:ETHUSDT` 등
+- **Forex**: `IC MARKETS:1`, `OANDA:EUR_USD` 등 (공백/콜론 포함 가능)
+
+**STOMP Destination 처리 규칙**:
+
+- **Destination 패턴**: `/topic/stock.ticker.{ticker}`
+- **현재 구현 정책 (Phase 6)**: 
+  - Ticker 문자열을 그대로 사용합니다 (`StompDestinationUtils.createDestination()` 사용)
+  - 공백/특수문자가 포함된 ticker(예: `IC MARKETS:1`)의 경우, STOMP destination은 그대로 `/topic/stock.ticker.IC MARKETS:1` 형식이 됩니다
+  - 프론트엔드/백엔드 모두에서 이 형식을 그대로 처리합니다
+- **향후 확장 가능성**: 
+  - URL 인코딩이 필요한 경우 `StompDestinationUtils.createEncodedDestination()` 메서드를 사용할 수 있습니다
+  - 예: `IC MARKETS:1` → `/topic/stock.ticker.IC%20MARKETS%3A1`
+  - 현재는 인코딩 없이 사용하며, STOMP 프로토콜이 이를 지원합니다
+
+### 10.5 Finnhub WebSocket 제약사항
+
+#### 구독 제한
+
+- **최대 동시 구독**: 50 Symbols
+- **해결 전략**: Dynamic Subscription Manager (LRU 기반)로 자동 관리
+  - 50개 초과 시 가장 오래된 비활성 종목을 자동 해제
+  - 모든 종목이 활성 상태면 신규 구독을 거부(Skip)
+
+#### Trade 미지원 거래소/브로커
+
+**Forex 브로커 (스트리밍 미지원)**:
+- FXCM
+- Forex.com
+- FHFX
+
+**대체 방법**: 위 브로커의 경우, 실시간 스트리밍 대신 다음 REST API를 사용하세요:
+- Forex Candles API: `GET /api/v1/stock/candles/{ticker}`
+- All Rates API: (향후 구현)
+
+**Crypto/Forex Trade 미지원**:
+- 일부 거래소에서는 trade 데이터를 제공하지 않을 수 있습니다
+- 이 경우 `volume=0`인 price update가 전송됩니다
+- 클라이언트는 `volume=0`을 감지하여 "Price Update Only" 상태로 표시할 수 있습니다
+
+### 10.6 메시지 처리 흐름
+
+```mermaid
+sequenceDiagram
+    participant Finnhub as Finnhub WS
+    participant Backend as Backend (Spring)
+    participant Redis as Redis Cache
+    participant STOMP as STOMP Broker
+    participant Frontend as Frontend Client
+    
+    Finnhub->>Backend: Trade Message (type:"trade", data[])
+    Backend->>Backend: Parse & Normalize
+    Backend->>Redis: SET stock:price:{ticker}
+    Backend->>STOMP: SEND /topic/stock.ticker.{ticker}
+    STOMP->>Frontend: STOMP MESSAGE (last price update)
+```
+
+**처리 단계**:
+
+1. **Finnhub WebSocket 수신**: 백엔드가 Finnhub에서 trade 메시지 수신
+2. **파싱 및 정규화**: JSON 파싱 후 표준 payload 형식으로 변환
+3. **Redis 캐시 업데이트**: 최신가를 `stock:price:{ticker}` 키로 저장
+4. **STOMP 브로드캐스트**: `/topic/stock.ticker.{ticker}` 토픽으로 모든 구독자에게 전송
+5. **프론트엔드 수신**: STOMP 클라이언트가 메시지를 받아 UI 업데이트
+
+### 10.7 에러 처리 및 재연결
+
+**연결 실패 시**:
+- 백엔드는 **지수 백오프(Exponential Backoff)** 전략으로 재연결 시도
+- 재연결 성공 시 현재 구독 풀의 모든 심볼을 자동으로 재구독
+
+**메시지 파싱 실패 시**:
+- 알 수 없는 타입 또는 빈 `data` 배열은 무시하고 디버그 로그만 기록
+- 파싱 오류가 발생해도 다른 정상 메시지 처리는 계속 진행
+
+**구독 실패 시**:
+- 50 Symbols 제한 초과로 신규 구독이 거부되면, 클라이언트는 기존 데이터(Redis 캐시 또는 REST API)를 사용
 
 ---
 
@@ -828,5 +1315,5 @@ CREATE TABLE api_usage_logs (
 
 ---
 
-**문서 버전:** 2.7.8 (지수 조회 ETF 변경 반영)  
+**문서 버전:** 2.7.13 (Phase 6: 실시간 통신 스펙 추가 및 Finnhub WebSocket 제약사항 정합화)  
 **최종 수정일:** 2026-01-19
