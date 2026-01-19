@@ -15,7 +15,7 @@ export default function Watchlist() {
         <WidgetCard title="관심 종목" action={<span className="text-yellow-500">★</span>} className="h-full">
             <div className="flex flex-col gap-3">
                 {stocks.map((stock) => (
-                    <div key={stock.t} className="flex justify-between items-center p-3 rounded-lg bg-white/5 hover:bg-white/10 cursor-pointer border border-transparent hover:border-white/10 group transition-all">
+                    <div key={stock.t} className="flex justify-between items-center p-3 rounded-lg bg-secondary/50 hover:bg-secondary cursor-pointer border border-transparent hover:border-border group transition-all">
                         <div className="flex items-center gap-3">
                             {/* Arrow Icon Circle */}
                             <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${stock.up ? 'bg-green-500/20 text-green-500' : 'bg-red-500/20 text-red-500'}`}>
@@ -23,8 +23,8 @@ export default function Watchlist() {
                             </div>
                             <div>
                                 <div className="flex items-baseline gap-2">
-                                    <span className="font-bold text-white text-sm">{stock.t}</span>
-                                    <span className="text-[10px] text-gray-500 uppercase">{stock.n}</span>
+                                    <span className="font-bold text-foreground text-sm">{stock.t}</span>
+                                    <span className="text-[10px] text-muted-foreground uppercase">{stock.n}</span>
                                 </div>
                                 <div className={`text-xs font-semibold ${stock.up ? 'text-green-500' : 'text-red-500'}`}>
                                     {stock.c}
@@ -33,12 +33,12 @@ export default function Watchlist() {
                         </div>
 
                         <div className="text-right">
-                            <div className="font-bold text-white text-sm">{stock.p}</div>
+                            <div className="font-bold text-foreground text-sm">{stock.p}</div>
                         </div>
                     </div>
                 ))}
                 {/* View All Button */}
-                <button className="w-full py-3 mt-2 rounded-lg border border-white/10 text-xs text-gray-400 hover:bg-white/5 hover:text-white transition-colors">
+                <button className="w-full py-3 mt-2 rounded-lg border border-border text-xs text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors">
                     전체 보기
                 </button>
             </div>

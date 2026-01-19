@@ -12,10 +12,10 @@ interface WidgetCardProps {
 
 export default function WidgetCard({ title, action, children, footer, className = "" }: WidgetCardProps) {
     return (
-        <div className={`bg-[#0F0F12] border border-white/10 rounded-2xl p-5 flex flex-col h-full overflow-hidden ${className}`}>
+        <div className={`bg-card border border-border rounded-2xl p-5 flex flex-col h-full overflow-hidden ${className}`}>
             {(title || action) && (
                 <div className="flex items-center justify-between mb-4 shrink-0">
-                    {title && <h3 className="text-white font-bold text-lg">{title}</h3>}
+                    {title && <h3 className="text-foreground font-bold text-lg">{title}</h3>}
                     {action && <div>{action}</div>}
                 </div>
             )}
@@ -23,7 +23,7 @@ export default function WidgetCard({ title, action, children, footer, className 
                 {children}
             </div>
             {footer && (
-                <div className="mt-4 pt-4 border-t border-white/5 shrink-0">
+                <div className="mt-4 pt-4 border-t border-border shrink-0">
                     {footer}
                 </div>
             )}

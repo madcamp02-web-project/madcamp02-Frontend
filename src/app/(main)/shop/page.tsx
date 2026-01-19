@@ -97,16 +97,17 @@ export default function ShopPage() {
     return (
         <div className="h-full w-full flex flex-col overflow-hidden">
             {/* Header */}
-            <div className="px-4 pt-2 pb-4 border-b border-white/5 shrink-0">
+            {/* Header */}
+            <div className="px-4 pt-2 pb-4 border-b border-border shrink-0">
                 <div className="flex justify-between items-center">
                     <div>
-                        <h1 className="text-2xl font-bold text-white">운명 캡슐 토이</h1>
-                        <p className="text-gray-500 text-sm">레버를 돌려 희귀 아이템을 뽑아보세요!</p>
+                        <h1 className="text-2xl font-bold text-foreground">운명 캡슐 토이</h1>
+                        <p className="text-muted-foreground text-sm">레버를 돌려 희귀 아이템을 뽑아보세요!</p>
                     </div>
-                    <div className="flex items-center gap-2 bg-[#1E1E24] border border-white/10 rounded-xl px-4 py-2 shadow-[0_0_10px_rgba(234,179,8,0.2)]">
+                    <div className="flex items-center gap-2 bg-secondary border border-border rounded-xl px-4 py-2 shadow-sm">
                         <span className="text-yellow-400 animate-pulse">✨</span>
-                        <span className="text-white font-bold">{coins.toLocaleString()}</span>
-                        <span className="text-gray-400 text-sm">코인</span>
+                        <span className="text-foreground font-bold">{coins.toLocaleString()}</span>
+                        <span className="text-muted-foreground text-sm">코인</span>
                     </div>
                 </div>
             </div>
@@ -123,8 +124,8 @@ export default function ShopPage() {
                             key={tab.key}
                             onClick={() => setActiveTab(tab.key)}
                             className={`relative flex-1 py-3 rounded-xl font-medium text-sm transition-all overflow-hidden group border ${activeTab === tab.key
-                                    ? `${tab.activeBorder} bg-white/5`
-                                    : 'border-white/10 bg-white/5 hover:bg-white/10'
+                                ? `${tab.activeBorder} bg-secondary`
+                                : 'border-border bg-card hover:bg-secondary/50'
                                 }`}
                         >
                             {/* Active Tab LED Glow */}
@@ -137,8 +138,8 @@ export default function ShopPage() {
                             )}
 
                             <div className="relative z-10 flex flex-col items-center gap-1">
-                                <div className={activeTab === tab.key ? 'text-white font-bold drop-shadow-md' : 'text-gray-400'}>{tab.label}</div>
-                                <div className={`text-xs ${activeTab === tab.key ? themeConfigs[tab.key].color : 'text-gray-500'}`}>
+                                <div className={activeTab === tab.key ? 'text-foreground font-bold drop-shadow-md' : 'text-muted-foreground'}>{tab.label}</div>
+                                <div className={`text-xs ${activeTab === tab.key ? themeConfigs[tab.key].color : 'text-muted-foreground'}`}>
                                     {tab.price} 코인
                                 </div>
                             </div>
@@ -150,20 +151,20 @@ export default function ShopPage() {
             {/* Main Content */}
             <div className="flex-1 overflow-auto p-4 flex gap-4">
                 {/* Gacha Machine */}
-                <div className={`relative flex-[2] bg-[#0F0F12] border ${activeTheme.borderColor}/30 rounded-2xl p-6 flex flex-col items-center justify-center overflow-hidden transition-colors duration-500`}>
+                <div className={`relative flex-[2] bg-card border ${activeTheme.borderColor}/30 rounded-2xl p-6 flex flex-col items-center justify-center overflow-hidden transition-colors duration-500`}>
                     {/* Machine LED Background Glow */}
                     <div className={`absolute inset-0 bg-gradient-to-br ${activeTheme.bgGlow} to-transparent opacity-30`}></div>
-                    <div className={`absolute inset-0 shadow-[0_0_50px_rgba(0,0,0,0.5)_inset]`}></div>
+                    <div className={`absolute inset-0 dark:shadow-[0_0_50px_rgba(0,0,0,0.5)_inset]`}></div>
 
                     {/* Capsule Machine */}
                     <div className="relative z-10">
                         {/* Top dome (glass part with capsules) */}
-                        <div className={`relative w-64 h-48 bg-gradient-to-b from-white/10 to-transparent rounded-t-[100px] border-2 border-white/20 overflow-hidden shadow-[0_0_30px_rgba(255,255,255,0.1)]`}>
+                        <div className={`relative w-64 h-48 bg-gradient-to-b from-white/20 to-transparent dark:from-white/10 rounded-t-[100px] border-2 border-gray-200 dark:border-white/20 overflow-hidden shadow-xl dark:shadow-[0_0_30px_rgba(255,255,255,0.1)]`}>
                             {/* Glass reflection */}
                             <div className="absolute top-4 left-4 w-12 h-24 bg-white/20 rounded-full blur-md transform -rotate-12 z-20"></div>
 
                             {/* Inner Glow based on Theme */}
-                            <div className={`absolute inset-0 bg-${activeTab === 'name' ? 'yellow' : activeTab === 'avatar' ? 'blue' : 'purple'}-500/10 z-0`}></div>
+                            <div className={`absolute inset-0 bg-${activeTab === 'name' ? 'yellow' : activeTab === 'avatar' ? 'blue' : 'purple'}-500/20 dark:bg-${activeTab === 'name' ? 'yellow' : activeTab === 'avatar' ? 'blue' : 'purple'}-500/10 z-0`}></div>
 
                             {/* Capsules inside */}
                             <div className="absolute inset-4 flex flex-wrap justify-center items-center gap-1 p-4 z-10">
@@ -189,7 +190,7 @@ export default function ShopPage() {
                         </div>
 
                         {/* Machine body */}
-                        <div className="w-64 bg-[#1E1E24] border-2 border-white/20 border-t-0 rounded-b-2xl p-4 shadow-xl relative">
+                        <div className="w-64 bg-secondary border-2 border-gray-200 dark:border-white/20 border-t-0 rounded-b-2xl p-4 shadow-xl relative">
                             {/* Side LED Lines */}
                             <div className={`absolute top-0 bottom-4 left-2 w-0.5 bg-${activeTab === 'name' ? 'yellow' : activeTab === 'avatar' ? 'blue' : 'purple'}-500/50 shadow-[0_0_5px_currentColor]`}></div>
                             <div className={`absolute top-0 bottom-4 right-2 w-0.5 bg-${activeTab === 'name' ? 'yellow' : activeTab === 'avatar' ? 'blue' : 'purple'}-500/50 shadow-[0_0_5px_currentColor]`}></div>
@@ -205,7 +206,7 @@ export default function ShopPage() {
                                 {/* Lever */}
                                 <div className="relative group cursor-pointer" onClick={handleGacha}>
                                     <div className={`w-3 h-10 bg-gradient-to-b from-gray-400 to-gray-600 rounded-full transition-transform duration-300 origin-bottom ${isSpinning ? 'rotate-45' : 'group-hover:rotate-12'}`}>
-                                        <div className={`absolute -top-1 left-1/2 -translate-x-1/2 w-5 h-5 ${activeTheme.btnBg} rounded-full border-2 border-white/50 shadow-[0_0_10px_currentColor]`}></div>
+                                        <div className={`absolute -top-1 left-1/2 -translate-x-1/2 w-5 h-5 ${activeTheme.btnBg} rounded-full border-2 border-white/50 dark:shadow-[0_0_10px_currentColor]`}></div>
                                     </div>
                                     <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-6 h-2 bg-gray-700 rounded-full"></div>
                                 </div>
@@ -226,7 +227,7 @@ export default function ShopPage() {
                     {/* Machine Label */}
                     <div className="text-center mt-6 mb-2 relative">
                         <h3 className={`font-black text-2xl tracking-widest ${activeTheme.color} drop-shadow-[0_0_10px_rgba(255,255,255,0.5)]`}>FORTUNE</h3>
-                        <h3 className={`font-black text-xl tracking-[0.5em] text-white/50`}>GACHA</h3>
+                        <h3 className={`font-black text-xl tracking-[0.5em] text-muted-foreground/50`}>GACHA</h3>
                     </div>
 
                     {/* Pull Button */}
@@ -234,8 +235,8 @@ export default function ShopPage() {
                         onClick={handleGacha}
                         disabled={coins < tabPrices[activeTab] || isSpinning}
                         className={`mt-4 px-16 py-3 rounded-xl font-bold text-sm transition-all duration-300 transform active:scale-95 ${coins >= tabPrices[activeTab] && !isSpinning
-                                ? `${activeTheme.btnBg} text-white shadow-[0_0_20px_rgba(0,0,0,0.5)] hover:shadow-[0_0_30px_rgba(255,255,255,0.3)] hover:brightness-110`
-                                : 'bg-gray-700 text-gray-500 cursor-not-allowed border border-white/5'
+                            ? `${activeTheme.btnBg} text-white shadow-[0_0_20px_rgba(0,0,0,0.5)] hover:shadow-[0_0_30px_rgba(255,255,255,0.3)] hover:brightness-110`
+                            : 'bg-gray-700 text-gray-400 cursor-not-allowed border border-white/5'
                             }`}
                     >
                         {isSpinning ? (
@@ -251,18 +252,18 @@ export default function ShopPage() {
                 {/* Right Panel */}
                 <div className="flex-[1] flex flex-col gap-4">
                     {/* Available Items */}
-                    <div className={`bg-[#0F0F12] border ${activeTheme.borderColor}/30 rounded-2xl p-4 transition-colors duration-500`}>
-                        <h3 className="text-white font-bold text-sm mb-3 flex items-center gap-2">
+                    <div className={`bg-card border ${activeTheme.borderColor}/30 rounded-2xl p-4 transition-colors duration-500`}>
+                        <h3 className="text-foreground font-bold text-sm mb-3 flex items-center gap-2">
                             <span className={activeTheme.color}>✨</span> 획득 가능 아이템
                         </h3>
                         <div className="space-y-2">
                             {gachaItems[activeTab].map((item) => (
-                                <div key={item.id} className="flex items-center gap-3 bg-[#1E1E24] rounded-lg p-2 border border-white/5 hover:border-white/20 transition-colors">
-                                    <div className="w-10 h-10 bg-white/5 rounded-lg flex items-center justify-center text-xl shadow-inner">
+                                <div key={item.id} className="flex items-center gap-3 bg-secondary rounded-lg p-2 border border-border hover:border-muted-foreground/30 transition-colors">
+                                    <div className="w-10 h-10 bg-card rounded-lg flex items-center justify-center text-xl shadow-inner">
                                         {item.image}
                                     </div>
                                     <div className="flex-1">
-                                        <p className="text-white text-sm font-medium">{item.name}</p>
+                                        <p className="text-foreground text-sm font-medium">{item.name}</p>
                                         <span className={`text-[10px] px-2 py-0.5 rounded ${rarityColors[item.rarity]} text-white shadow-sm`}>
                                             {rarityLabels[item.rarity]}
                                         </span>
@@ -273,16 +274,16 @@ export default function ShopPage() {
                     </div>
 
                     {/* Probability */}
-                    <div className={`bg-[#0F0F12] border ${activeTheme.borderColor}/30 rounded-2xl p-4 transition-colors duration-500`}>
-                        <h3 className="text-white font-bold text-sm mb-3">확률 정보</h3>
+                    <div className={`bg-card border ${activeTheme.borderColor}/30 rounded-2xl p-4 transition-colors duration-500`}>
+                        <h3 className="text-foreground font-bold text-sm mb-3">확률 정보</h3>
                         <div className="space-y-2">
                             {probabilities.map((prob) => (
-                                <div key={prob.rarity} className="flex items-center justify-between p-2 bg-[#1E1E24]/50 rounded-lg">
+                                <div key={prob.rarity} className="flex items-center justify-between p-2 bg-secondary/50 rounded-lg">
                                     <div className="flex items-center gap-2">
                                         <div className={`w-2 h-2 rounded-full ${prob.color} shadow-[0_0_5px_currentColor]`}></div>
-                                        <span className="text-gray-300 text-sm font-medium">{prob.rarity}</span>
+                                        <span className="text-muted-foreground text-sm font-medium">{prob.rarity}</span>
                                     </div>
-                                    <span className="text-gray-400 text-sm">{prob.percent}%</span>
+                                    <span className="text-muted-foreground text-sm">{prob.percent}%</span>
                                 </div>
                             ))}
                         </div>
