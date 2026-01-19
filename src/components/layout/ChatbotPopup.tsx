@@ -1,13 +1,20 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
+import { useUserStore } from "@/stores/user-store";
 import { useUIStore } from "@/stores/ui-store";
+import { useChatStore } from "@/stores/chat-store";
+import { sendMessageToAI } from "@/lib/api/ai";
+import { useRouter } from "next/navigation";
 
 export default function ChatbotPopup() {
     const { isChatbotOpen, closeChatbot, isSidebarOpen } = useUIStore();
-    const [messages, setMessages] = useState<{ text: string; isUser: boolean }[]>([
-        { text: "안녕하세요. 나는 천년을 살아온 투자 도사라네.\n자네의 투자와 운세에 대해 무엇이든 물어보게나.", isUser: false }
-    ]);
+    const { profile } = useUserStore();
+    const router = useRouter();
+
+    // Store
+    const { messages, isLoading, addMessage, setLoading } = useChatStore();
+
     const [inputValue, setInputValue] = useState("");
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -17,30 +24,93 @@ export default function ChatbotPopup() {
 
     useEffect(() => {
         scrollToBottom();
-    }, [messages, isChatbotOpen]);
+    }, [messages, isChatbotOpen, isLoading]);
 
     // Handle outside click or escape
     // (Optional: depending on UX preference, maybe we want it to stay open)
 
-    const handleSendMessage = () => {
-        if (!inputValue.trim()) return;
+    const handleSendMessage = async () => {
+        if (!inputValue.trim() || isLoading) return;
 
-        // User message
-        const newMessages = [...messages, { text: inputValue, isUser: true }];
-        setMessages(newMessages);
+        const userText = inputValue;
+
+        // 1. User message
+        addMessage({ text: userText, isUser: true });
         setInputValue("");
+        setLoading(true);
 
-        // Mock AI response
-        setTimeout(() => {
-            setMessages(prev => [...prev, {
-                text: "허허, 투자는 마음의 평정심이 가장 중요하다네. 조금 더 신중하게 살펴보게나.",
-                isUser: false
-            }]);
-        }, 1000);
+        try {
+            // 2. API Call - Inject Context if available
+            let contextMessage = userText;
+            if (profile.birthDate) {
+                const birthInfo = `${profile.birthDate} ${profile.birthTime || "00:00"}`;
+                // Prepend context invisibly to the user
+                contextMessage = `(컨텍스트 정보: 사용자 생년월일=${birthInfo}) ${userText}`;
+            }
+
+            const response = await sendMessageToAI(contextMessage);
+
+            // 3. AI Response
+            addMessage({ text: response, isUser: false });
+        } catch (error) {
+            addMessage({ text: "허허, 기가 약해져서 목소리가 안 들리는구먼. 다시 말해주게.", isUser: false });
+        } finally {
+            setLoading(false);
+        }
     };
 
+    const handleQuickAction = async (type: "fortune" | "stock") => {
+        if (isLoading) return;
+
+        if (!profile.birthDate) {
+            addMessage({
+                text: "허허, 자네의 사주를 알아야 운세를 봐줄 수 있지 않겠나? '마이페이지'에서 생년월일을 먼저 알려주게.",
+                isUser: false
+            });
+            return;
+        }
+
+        const birthInfo = `${profile.birthDate} ${profile.birthTime || "00:00"}`;
+        let prompt = "";
+        let displayMessage = "";
+
+        if (type === "fortune") {
+            displayMessage = "오늘의 금전운을 봐줘";
+            prompt = `내 생년월일은 ${birthInfo}야. 오늘 나의 금전운을 3줄 요약해서 알려줘.`;
+        } else {
+            displayMessage = "내 사주에 맞는 추천 종목을 알려줘";
+            prompt = `내 생년월일은 ${birthInfo}야. 내 사주와 오행에 맞춰서 오늘 투자하면 좋을 주식 섹터나 업종을 3가지 정도 간단히 추천해줘.`;
+        }
+
+        addMessage({ text: displayMessage, isUser: true });
+        setLoading(true);
+
+        try {
+            const response = await sendMessageToAI(prompt);
+            addMessage({ text: response, isUser: false });
+        } catch (error) {
+            addMessage({ text: "허허, 기가 약해져서 목소리가 안 들리는구먼. 다시 말해주게.", isUser: false });
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+    const adjustTextareaHeight = () => {
+        if (textareaRef.current) {
+            textareaRef.current.style.height = "auto";
+            textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 100)}px`;
+        }
+    };
+
+    useEffect(() => {
+        adjustTextareaHeight();
+    }, [inputValue]);
+
     const handleKeyDown = (e: React.KeyboardEvent) => {
-        if (e.key === 'Enter') {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
             handleSendMessage();
         }
     };
@@ -69,7 +139,7 @@ export default function ChatbotPopup() {
             </div>
 
             {/* Messages */}
-            <div className="flex-1 p-4 overflow-y-auto h-[350px] bg-[#0F0F12] relative scrollbar-hide">
+            <div className="flex-1 p-4 overflow-y-auto space-y-4 max-h-[380px] bg-[#0F0F12] relative scrollbar-hide">
                 {/* Background Pattern */}
                 <div className="absolute inset-0 opacity-5 pointer-events-none"
                     style={{ backgroundImage: "radial-gradient(circle at 50% 50%, #7c3aed 1px, transparent 1px)", backgroundSize: "20px 20px" }}>
@@ -81,9 +151,11 @@ export default function ChatbotPopup() {
                     {messages.map((msg, idx) => (
                         <div key={idx} className={`flex ${msg.isUser ? 'justify-end' : 'justify-start'}`}>
                             {!msg.isUser && (
-                                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center text-sm mr-2 shrink-0 border border-white/10 shadow-lg">
-                                    🧙‍♂️
-                                </div>
+                                <img
+                                    src="/images/oracle_sage.png"
+                                    alt="도사"
+                                    className="w-8 h-8 rounded-full object-cover mr-2 shrink-0 border-2 border-yellow-500/50 shadow-[0_0_10px_rgba(234,179,8,0.4)]"
+                                />
                             )}
                             <div
                                 className={`max-w-[75%] px-3 py-2 rounded-xl text-sm whitespace-pre-line shadow-md ${msg.isUser
@@ -96,33 +168,56 @@ export default function ChatbotPopup() {
                         </div>
                     ))}
                     <div ref={messagesEndRef} />
+
+                    {/* Loading Indicator */}
+                    {isLoading && (
+                        <div className="flex justify-start">
+                            <img
+                                src="/images/oracle_sage.png"
+                                alt="도사"
+                                className="w-8 h-8 rounded-full object-cover mr-2 shrink-0 border-2 border-yellow-500/50 shadow-[0_0_10px_rgba(234,179,8,0.4)]"
+                            />
+                            <div className="bg-[#27272a] text-gray-200 px-3 py-2 rounded-xl rounded-bl-none border border-white/10 shadow-md flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+                                <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+                                <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce"></span>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
 
             {/* Quick Actions */}
             <div className="bg-[#16161d] p-2 flex gap-2 overflow-x-auto scrollbar-hide shrink-0 border-t border-white/10">
-                <button className="flex-1 whitespace-nowrap px-3 py-1.5 bg-yellow-500/10 text-yellow-400 text-xs rounded-lg border border-yellow-500/30 hover:bg-yellow-500/20 transition-colors">
+                <button
+                    onClick={() => handleQuickAction("fortune")}
+                    className="flex-1 whitespace-nowrap px-3 py-1.5 bg-yellow-500/10 text-yellow-400 text-xs rounded-lg border border-yellow-500/30 hover:bg-yellow-500/20 transition-colors"
+                >
                     📜 오늘의 운세
                 </button>
-                <button className="flex-1 whitespace-nowrap px-3 py-1.5 bg-green-500/10 text-green-400 text-xs rounded-lg border border-green-500/30 hover:bg-green-500/20 transition-colors">
+                <button
+                    onClick={() => handleQuickAction("stock")}
+                    className="flex-1 whitespace-nowrap px-3 py-1.5 bg-green-500/10 text-green-400 text-xs rounded-lg border border-green-500/30 hover:bg-green-500/20 transition-colors"
+                >
                     📈 추천 종목
                 </button>
             </div>
 
             {/* Input Area */}
             <div className="p-3 bg-[#16161d] border-t border-white/10 shrink-0">
-                <div className="relative">
-                    <input
-                        type="text"
+                <div className="relative flex items-end gap-2">
+                    <textarea
+                        ref={textareaRef}
                         value={inputValue}
                         onChange={(e) => setInputValue(e.target.value)}
                         onKeyDown={handleKeyDown}
                         placeholder="도사에게 물어보세요..."
-                        className="w-full bg-[#27272a] text-white text-sm rounded-xl pl-4 pr-10 py-2.5 focus:outline-none focus:ring-1 focus:ring-[var(--accent-purple)] border border-white/10 placeholder-gray-500"
+                        rows={1}
+                        className="w-full bg-[#27272a] text-white text-sm rounded-xl pl-4 pr-10 py-2.5 focus:outline-none focus:ring-1 focus:ring-[var(--accent-purple)] border border-white/10 placeholder-gray-500 resize-none max-h-[100px] scrollbar-hide"
                     />
                     <button
                         onClick={handleSendMessage}
-                        className="absolute right-1.5 top-1.5 p-1.5 bg-[var(--accent-purple)] rounded-lg text-white hover:bg-[#6d28d9] transition-colors"
+                        className="absolute right-1.5 bottom-1.5 p-1.5 bg-[var(--accent-purple)] rounded-lg text-white hover:bg-[#6d28d9] transition-colors h-8 w-8 flex items-center justify-center"
                     >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />

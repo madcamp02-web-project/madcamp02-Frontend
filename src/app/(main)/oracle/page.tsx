@@ -1,6 +1,9 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import { useChatStore } from '@/stores/chat-store';
+import { sendMessageToAI } from '@/lib/api/ai';
+import { useUserStore } from '@/stores/user-store';
 
 // Mock Data - 오행 밸런스
 const fiveElementsBalance = [
@@ -12,21 +15,43 @@ const fiveElementsBalance = [
 ];
 
 export default function OraclePage() {
+    const { messages, isLoading, addMessage, setLoading } = useChatStore();
+    const { profile } = useUserStore();
     const [chatInput, setChatInput] = useState('');
-    const [chatMessages, setChatMessages] = useState([
-        { role: 'assistant', content: '안녕하시오. 나는 천년을 살아온 투자 도사라네. 🔮  자네의 투자와 운세에 대해 무엇이든 물어보게나.' }
-    ]);
+    const messagesEndRef = useRef<HTMLDivElement>(null);
 
-    const handleSendMessage = () => {
-        if (!chatInput.trim()) return;
-        setChatMessages([...chatMessages, { role: 'user', content: chatInput }]);
-        setTimeout(() => {
-            setChatMessages(prev => [...prev, {
-                role: 'assistant',
-                content: '오늘 당신의 사주를 보니, 목(木)의 기운이 강하군요. 기술주와 성장주에 좋은 기운이 있습니다. 다만 급한 결정은 피하시고, 신중하게 접근하세요! ✨'
-            }]);
-        }, 1000);
+    const scrollToBottom = () => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    };
+
+    useEffect(() => {
+        scrollToBottom();
+    }, [messages]);
+
+    const handleSendMessage = async () => {
+        if (!chatInput.trim() || isLoading) return;
+
+        const userText = chatInput;
+        addMessage({ text: userText, isUser: true });
         setChatInput('');
+        setLoading(true);
+
+        try {
+            // Context Injection
+            let contextMessage = userText;
+            const birthInfo = profile.birthDate ? `${profile.birthDate} ${profile.birthTime || "00:00"}` : "정보 없음";
+
+            if (profile.birthDate) {
+                contextMessage = `[시스템 정보: 사용자 생년월일=${birthInfo}] ${userText}`;
+            }
+
+            const response = await sendMessageToAI(contextMessage);
+            addMessage({ text: response, isUser: false });
+        } catch (error) {
+            addMessage({ text: "허허, 기가 약해져서 목소리가 안 들리는구먼. 다시 말해주게.", isUser: false });
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
@@ -60,17 +85,27 @@ export default function OraclePage() {
                         </div>
 
                         {/* Chat Messages */}
-                        <div className="flex-1 overflow-auto space-y-3 mb-3 pr-2">
-                            {chatMessages.map((msg, idx) => (
-                                <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                    <div className={`max-w-[80%] px-4 py-2 rounded-2xl text-sm shadow-[0_0_10px_rgba(0,0,0,0.2)] ${msg.role === 'user'
+                        <div className="flex-1 overflow-auto space-y-3 mb-3 pr-2 scrollbar-hide">
+                            {messages.map((msg, idx) => (
+                                <div key={idx} className={`flex ${msg.isUser ? 'justify-end' : 'justify-start'}`}>
+                                    <div className={`max-w-[80%] px-4 py-2 rounded-2xl text-sm whitespace-pre-line shadow-[0_0_10px_rgba(0,0,0,0.2)] ${msg.isUser
                                         ? 'bg-yellow-500 text-black font-medium shadow-[0_0_10px_rgba(234,179,8,0.3)]'
                                         : 'bg-secondary text-foreground border border-border'
                                         }`}>
-                                        {msg.content}
+                                        {msg.text}
                                     </div>
                                 </div>
                             ))}
+                            {isLoading && (
+                                <div className="flex justify-start">
+                                    <div className="bg-secondary text-foreground border border-border px-4 py-2 rounded-2xl flex items-center gap-1">
+                                        <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+                                        <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+                                        <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce"></span>
+                                    </div>
+                                </div>
+                            )}
+                            <div ref={messagesEndRef} />
                         </div>
 
                         {/* Chat Input */}
@@ -79,7 +114,7 @@ export default function OraclePage() {
                                 type="text"
                                 value={chatInput}
                                 onChange={(e) => setChatInput(e.target.value)}
-                                onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+                                onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
                                 placeholder="도사에게 질문하세요..."
                                 className="flex-1 bg-secondary border border-border rounded-xl px-4 py-2 text-foreground text-sm outline-none focus:border-yellow-500/50 focus:shadow-[0_0_10px_rgba(234,179,8,0.2)] transition-all"
                             />
