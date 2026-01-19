@@ -1,6 +1,6 @@
 "use client";
 
-import { useUIStore } from "@/store/ui-store";
+import { useUIStore } from "@/stores/ui-store";
 
 export default function ChatbotButton() {
   const { isSidebarOpen, toggleChatbot } = useUIStore();

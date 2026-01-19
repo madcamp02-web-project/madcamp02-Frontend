@@ -55,9 +55,9 @@ export default function MarketNewsPage() {
     return (
         <div className="h-full w-full flex flex-col overflow-hidden">
             {/* Header */}
-            <div className="px-4 pt-2 pb-4 border-b border-white/5 shrink-0">
-                <h1 className="text-2xl font-bold text-white">시장 현황</h1>
-                <p className="text-gray-500 text-sm">실시간 시장 동향 및 뉴스</p>
+            <div className="px-4 pt-2 pb-4 border-b border-border shrink-0">
+                <h1 className="text-2xl font-bold text-foreground">시장 현황</h1>
+                <p className="text-muted-foreground text-sm">실시간 시장 동향 및 뉴스</p>
             </div>
 
             {/* Scrollable Content */}
@@ -65,14 +65,14 @@ export default function MarketNewsPage() {
                 {/* Market Indices */}
                 <div className="grid grid-cols-4 gap-4 mb-6">
                     {marketIndices.map((index) => (
-                        <div key={index.name} className="bg-[#0F0F12] border border-white/10 rounded-2xl p-4">
+                        <div key={index.name} className="bg-card border border-border rounded-2xl p-4">
                             <div className="flex justify-between items-start mb-2">
-                                <span className="text-gray-400 text-sm">{index.name}</span>
+                                <span className="text-muted-foreground text-sm">{index.name}</span>
                                 <span className={`text-xs ${index.isPositive ? 'text-green-400' : 'text-red-400'}`}>
                                     ↗ {index.changePercent}
                                 </span>
                             </div>
-                            <div className="text-2xl font-bold text-white mb-1">{index.value}</div>
+                            <div className="text-2xl font-bold text-foreground mb-1">{index.value}</div>
                             <div className={`text-sm ${index.isPositive ? 'text-green-400' : 'text-red-400'}`}>
                                 {index.change}
                             </div>
@@ -83,25 +83,25 @@ export default function MarketNewsPage() {
                 {/* Stock Rankings */}
                 <div className="grid grid-cols-3 gap-4 mb-6">
                     {/* Rising Stocks */}
-                    <div className="bg-[#0F0F12] border border-white/10 rounded-2xl p-4">
+                    <div className="bg-card border border-border rounded-2xl p-4">
                         <div className="flex items-center gap-2 mb-4">
                             <span className="text-green-400">🔥</span>
-                            <h2 className="text-white font-bold">급등 종목</h2>
+                            <h2 className="text-foreground font-bold">급등 종목</h2>
                         </div>
                         <div className="space-y-2">
                             {risingStocks.map((stock) => (
-                                <div key={stock.code} className="flex items-center justify-between py-2 border-b border-white/5">
+                                <div key={stock.code} className="flex items-center justify-between py-2 border-b border-border">
                                     <div className="flex items-center gap-3">
                                         <span className="w-6 h-6 bg-green-500/20 rounded-full flex items-center justify-center text-green-400 text-xs font-bold">
                                             {stock.rank}
                                         </span>
                                         <div>
-                                            <div className="text-white font-medium text-sm">{stock.name}</div>
-                                            <div className="text-gray-500 text-xs">{stock.code}</div>
+                                            <div className="text-foreground font-medium text-sm">{stock.name}</div>
+                                            <div className="text-muted-foreground text-xs">{stock.code}</div>
                                         </div>
                                     </div>
                                     <div className="text-right">
-                                        <div className="text-white font-medium text-sm">{stock.price.toLocaleString()}</div>
+                                        <div className="text-foreground font-medium text-sm">{stock.price.toLocaleString()}</div>
                                         <div className="text-red-500 text-xs font-medium">{stock.changePercent}</div>
                                     </div>
                                 </div>
@@ -110,25 +110,25 @@ export default function MarketNewsPage() {
                     </div>
 
                     {/* Falling Stocks */}
-                    <div className="bg-[#0F0F12] border border-white/10 rounded-2xl p-4">
+                    <div className="bg-card border border-border rounded-2xl p-4">
                         <div className="flex items-center gap-2 mb-4">
                             <span className="text-red-400">📉</span>
-                            <h2 className="text-white font-bold">급락 종목</h2>
+                            <h2 className="text-foreground font-bold">급락 종목</h2>
                         </div>
                         <div className="space-y-2">
                             {fallingStocks.map((stock) => (
-                                <div key={stock.code} className="flex items-center justify-between py-2 border-b border-white/5">
+                                <div key={stock.code} className="flex items-center justify-between py-2 border-b border-border">
                                     <div className="flex items-center gap-3">
                                         <span className="w-6 h-6 bg-red-500/20 rounded-full flex items-center justify-center text-red-400 text-xs font-bold">
                                             {stock.rank}
                                         </span>
                                         <div>
-                                            <div className="text-white font-medium text-sm">{stock.name}</div>
-                                            <div className="text-gray-500 text-xs">{stock.code}</div>
+                                            <div className="text-foreground font-medium text-sm">{stock.name}</div>
+                                            <div className="text-muted-foreground text-xs">{stock.code}</div>
                                         </div>
                                     </div>
                                     <div className="text-right">
-                                        <div className="text-white font-medium text-sm">{stock.price.toLocaleString()}</div>
+                                        <div className="text-foreground font-medium text-sm">{stock.price.toLocaleString()}</div>
                                         <div className="text-blue-500 text-xs font-medium">{stock.changePercent}</div>
                                     </div>
                                 </div>
@@ -137,25 +137,25 @@ export default function MarketNewsPage() {
                     </div>
 
                     {/* Top Volume */}
-                    <div className="bg-[#0F0F12] border border-white/10 rounded-2xl p-4">
+                    <div className="bg-card border border-border rounded-2xl p-4">
                         <div className="flex items-center gap-2 mb-4">
                             <span className="text-yellow-400">⚡</span>
-                            <h2 className="text-white font-bold">거래량 상위</h2>
+                            <h2 className="text-foreground font-bold">거래량 상위</h2>
                         </div>
                         <div className="space-y-2">
                             {topVolumeStocks.map((stock, idx) => (
-                                <div key={idx} className="flex items-center justify-between py-2 border-b border-white/5">
+                                <div key={idx} className="flex items-center justify-between py-2 border-b border-border">
                                     <div className="flex items-center gap-3">
                                         <span className="w-6 h-6 bg-yellow-500/20 rounded-full flex items-center justify-center text-yellow-400 text-xs font-bold">
                                             {stock.rank}
                                         </span>
                                         <div>
-                                            <div className="text-white font-medium text-sm">{stock.name}</div>
-                                            <div className="text-gray-500 text-xs">{stock.volume}</div>
+                                            <div className="text-foreground font-medium text-sm">{stock.name}</div>
+                                            <div className="text-muted-foreground text-xs">{stock.volume}</div>
                                         </div>
                                     </div>
                                     <div className="text-right">
-                                        <div className="text-white font-medium text-sm">{stock.price.toLocaleString()}</div>
+                                        <div className="text-foreground font-medium text-sm">{stock.price.toLocaleString()}</div>
                                         <div className={`text-xs font-medium ${stock.changePercent.startsWith('+') ? 'text-red-500' : 'text-blue-500'}`}>
                                             {stock.changePercent}
                                         </div>
@@ -167,28 +167,28 @@ export default function MarketNewsPage() {
                 </div>
 
                 {/* News Section */}
-                <div className="bg-[#0F0F12] border border-white/10 rounded-2xl p-4">
+                <div className="bg-card border border-border rounded-2xl p-4">
                     <div className="flex justify-between items-center mb-4">
                         <div className="flex items-center gap-2">
                             <span className="text-yellow-400">⚡</span>
-                            <h2 className="text-white font-bold">실시간 뉴스</h2>
+                            <h2 className="text-foreground font-bold">실시간 뉴스</h2>
                         </div>
-                        <button className="text-gray-400 text-sm hover:text-white transition-colors">
+                        <button className="text-muted-foreground text-sm hover:text-foreground transition-colors">
                             전체보기
                         </button>
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
                         {newsItems.map((news, idx) => (
-                            <div key={idx} className="bg-[#1E1E24] border border-white/5 rounded-xl p-4 hover:border-white/20 transition-all cursor-pointer">
+                            <div key={idx} className="bg-secondary border border-border rounded-xl p-4 hover:border-muted-foreground/30 transition-all cursor-pointer">
                                 <div className="flex items-center gap-2 mb-2">
                                     <span className="px-2 py-0.5 bg-green-500/20 text-green-400 text-xs rounded font-medium">
                                         {news.category}
                                     </span>
-                                    <span className="text-gray-500 text-xs">{news.timeAgo}</span>
+                                    <span className="text-muted-foreground text-xs">{news.timeAgo}</span>
                                 </div>
-                                <h3 className="text-white font-medium mb-1">{news.title}</h3>
-                                <p className="text-gray-500 text-sm line-clamp-2">{news.desc}</p>
+                                <h3 className="text-foreground font-medium mb-1">{news.title}</h3>
+                                <p className="text-muted-foreground text-sm line-clamp-2">{news.desc}</p>
                             </div>
                         ))}
                     </div>

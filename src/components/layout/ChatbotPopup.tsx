@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { useUIStore } from "@/store/ui-store";
+import { useUIStore } from "@/stores/ui-store";
 
 export default function ChatbotPopup() {
     const { isChatbotOpen, closeChatbot, isSidebarOpen } = useUIStore();
@@ -87,8 +87,8 @@ export default function ChatbotPopup() {
                             )}
                             <div
                                 className={`max-w-[75%] px-3 py-2 rounded-xl text-sm whitespace-pre-line shadow-md ${msg.isUser
-                                        ? 'bg-[#4f46e5] text-white rounded-br-none border border-[#6366f1]'
-                                        : 'bg-[#27272a] text-gray-200 rounded-bl-none border border-white/10'
+                                    ? 'bg-[#4f46e5] text-white rounded-br-none border border-[#6366f1]'
+                                    : 'bg-[#27272a] text-gray-200 rounded-bl-none border border-white/10'
                                     }`}
                             >
                                 {msg.text}

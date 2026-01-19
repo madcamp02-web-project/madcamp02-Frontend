@@ -1,7 +1,7 @@
 "use client";
 
 import React from 'react';
-import { useUserStore } from '@/store/user-store';
+import { useUserStore } from '@/stores/user-store';
 
 // Top 3 랭커 데이터 (Mock)
 const topRankers = [
@@ -25,11 +25,11 @@ export default function RankingPage() {
     const { profile, items, stats, isRankingJoined } = useUserStore();
 
     return (
-        <div className="h-full w-full flex flex-col overflow-hidden bg-[#0F0F12]">
+        <div className="h-full w-full flex flex-col overflow-hidden bg-background">
             {/* Header */}
-            <div className="text-center py-4 border-b border-white/5 shrink-0">
-                <h1 className="text-2xl font-bold text-white">🏆 수익률 랭킹 🏆</h1>
-                <p className="text-gray-500 text-sm">이번 달 최고의 투자자들을 만나보세요</p>
+            <div className="px-4 pt-4 shrink-0 text-left">
+                <h1 className="text-2xl font-bold text-foreground">🏆 수익률 랭킹 🏆</h1>
+                <p className="text-muted-foreground text-sm">이번 달 최고의 투자자들을 만나보세요</p>
             </div>
 
             {/* Main Content */}
@@ -37,67 +37,67 @@ export default function RankingPage() {
                 {/* Event Cards */}
                 <div className="grid grid-cols-3 gap-4 mb-6">
                     {/* 주간 대회 (Gold) */}
-                    <div className="relative bg-[#0F0F12] border border-yellow-500/30 rounded-2xl p-4 overflow-hidden group">
-                        {/* LED Glow Effect */}
-                        <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/5 to-transparent opacity-50 group-hover:opacity-100 transition-opacity"></div>
-                        <div className="absolute top-0 inset-x-0 h-[1px] bg-yellow-400 shadow-[0_0_10px_rgba(234,179,8,0.8)]"></div>
-                        <div className="absolute inset-0 shadow-[0_0_20px_rgba(234,179,8,0.1)_inset]"></div>
+                    <div className="relative bg-yellow-500/5 dark:bg-card border border-yellow-500/30 rounded-2xl p-4 overflow-hidden group">
+                        {/* LED Glow Effect (Dark Mode Only) */}
+                        <div className="hidden dark:block absolute inset-0 bg-gradient-to-br from-yellow-500/5 to-transparent opacity-50 group-hover:opacity-100 transition-opacity"></div>
+                        <div className="hidden dark:block absolute top-0 inset-x-0 h-[1px] bg-yellow-400 shadow-[0_0_10px_rgba(234,179,8,0.8)]"></div>
+                        <div className="hidden dark:block absolute inset-0 shadow-[0_0_20px_rgba(234,179,8,0.1)_inset]"></div>
 
                         <div className="relative z-10">
                             <div className="flex items-center gap-2 mb-2">
-                                <span className="text-yellow-400 text-lg drop-shadow-[0_0_5px_rgba(234,179,8,0.8)]">{events[0].icon}</span>
-                                <h3 className="text-white font-bold drop-shadow-[0_0_5px_rgba(234,179,8,0.3)]">{events[0].title}</h3>
+                                <span className="text-yellow-400 text-lg dark:drop-shadow-[0_0_5px_rgba(234,179,8,0.8)]">{events[0].icon}</span>
+                                <h3 className="text-foreground font-bold dark:drop-shadow-[0_0_5px_rgba(234,179,8,0.3)]">{events[0].title}</h3>
                             </div>
-                            <p className="text-gray-400 text-xs mb-2">{events[0].desc}</p>
-                            <p className="text-yellow-200/80 text-xs mb-2">⏰ {events[0].time}</p>
+                            <p className="text-muted-foreground text-xs mb-2">{events[0].desc}</p>
+                            <p className="text-yellow-600/80 dark:text-yellow-200/80 text-xs mb-2">⏰ {events[0].time}</p>
                             <div className="border-t border-yellow-500/20 pt-2">
-                                <p className="text-gray-400 text-xs">보상</p>
-                                <p className="text-yellow-400 text-sm font-bold drop-shadow-[0_0_5px_rgba(234,179,8,0.5)]">✨ {events[0].reward}</p>
+                                <p className="text-muted-foreground text-xs">보상</p>
+                                <p className="text-yellow-500 dark:text-yellow-400 text-sm font-bold dark:drop-shadow-[0_0_5px_rgba(234,179,8,0.5)]">✨ {events[0].reward}</p>
                             </div>
                         </div>
                     </div>
 
                     {/* 월간 대회 (Purple) */}
-                    <div className="relative bg-[#0F0F12] border border-purple-500/30 rounded-2xl p-4 overflow-hidden group">
-                        {/* LED Glow Effect */}
-                        <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 to-transparent opacity-50 group-hover:opacity-100 transition-opacity"></div>
-                        <div className="absolute top-0 inset-x-0 h-[1px] bg-purple-400 shadow-[0_0_10px_rgba(168,85,247,0.8)]"></div>
-                        <div className="absolute inset-0 shadow-[0_0_20px_rgba(168,85,247,0.1)_inset]"></div>
+                    <div className="relative bg-purple-500/5 dark:bg-card border border-purple-500/30 rounded-2xl p-4 overflow-hidden group">
+                        {/* LED Glow Effect (Dark Mode Only) */}
+                        <div className="hidden dark:block absolute inset-0 bg-gradient-to-br from-purple-500/5 to-transparent opacity-50 group-hover:opacity-100 transition-opacity"></div>
+                        <div className="hidden dark:block absolute top-0 inset-x-0 h-[1px] bg-purple-400 shadow-[0_0_10px_rgba(168,85,247,0.8)]"></div>
+                        <div className="hidden dark:block absolute inset-0 shadow-[0_0_20px_rgba(168,85,247,0.1)_inset]"></div>
 
                         <div className="relative z-10">
                             <div className="flex items-center gap-2 mb-2">
-                                <span className="text-purple-400 text-lg drop-shadow-[0_0_5px_rgba(168,85,247,0.8)]">{events[1].icon}</span>
-                                <h3 className="text-white font-bold drop-shadow-[0_0_5px_rgba(168,85,247,0.3)]">{events[1].title}</h3>
+                                <span className="text-purple-400 text-lg dark:drop-shadow-[0_0_5px_rgba(168,85,247,0.8)]">{events[1].icon}</span>
+                                <h3 className="text-foreground font-bold dark:drop-shadow-[0_0_5px_rgba(168,85,247,0.3)]">{events[1].title}</h3>
                             </div>
-                            <p className="text-gray-400 text-xs mb-2">{events[1].desc}</p>
-                            <p className="text-purple-200/80 text-xs mb-2">⏰ {events[1].time}</p>
+                            <p className="text-muted-foreground text-xs mb-2">{events[1].desc}</p>
+                            <p className="text-purple-600/80 dark:text-purple-200/80 text-xs mb-2">⏰ {events[1].time}</p>
                             <div className="border-t border-purple-500/20 pt-2">
-                                <p className="text-gray-400 text-xs">보상</p>
-                                <p className="text-purple-400 text-sm font-bold drop-shadow-[0_0_5px_rgba(168,85,247,0.5)]">🎁 {events[1].reward}</p>
+                                <p className="text-muted-foreground text-xs">보상</p>
+                                <p className="text-purple-500 dark:text-purple-400 text-sm font-bold dark:drop-shadow-[0_0_5px_rgba(168,85,247,0.5)]">🎁 {events[1].reward}</p>
                             </div>
                         </div>
                     </div>
 
                     {/* 달성 업적 (Green) */}
-                    <div className="relative bg-[#0F0F12] border border-green-500/30 rounded-2xl p-4 overflow-hidden group">
-                        {/* LED Glow Effect */}
-                        <div className="absolute inset-0 bg-gradient-to-br from-green-500/5 to-transparent opacity-50 group-hover:opacity-100 transition-opacity"></div>
-                        <div className="absolute top-0 inset-x-0 h-[1px] bg-green-400 shadow-[0_0_10px_rgba(34,197,94,0.8)]"></div>
-                        <div className="absolute inset-0 shadow-[0_0_20px_rgba(34,197,94,0.1)_inset]"></div>
+                    <div className="relative bg-green-500/5 dark:bg-card border border-green-500/30 rounded-2xl p-4 overflow-hidden group">
+                        {/* LED Glow Effect (Dark Mode Only) */}
+                        <div className="hidden dark:block absolute inset-0 bg-gradient-to-br from-green-500/5 to-transparent opacity-50 group-hover:opacity-100 transition-opacity"></div>
+                        <div className="hidden dark:block absolute top-0 inset-x-0 h-[1px] bg-green-400 shadow-[0_0_10px_rgba(34,197,94,0.8)]"></div>
+                        <div className="hidden dark:block absolute inset-0 shadow-[0_0_20px_rgba(34,197,94,0.1)_inset]"></div>
 
                         <div className="relative z-10">
                             <div className="flex items-center gap-2 mb-2">
-                                <span className="text-green-400 text-lg drop-shadow-[0_0_5px_rgba(34,197,94,0.8)]">🎖️</span>
-                                <h3 className="text-white font-bold drop-shadow-[0_0_5px_rgba(34,197,94,0.3)]">달성 업적</h3>
+                                <span className="text-green-400 text-lg dark:drop-shadow-[0_0_5px_rgba(34,197,94,0.8)]">🎖️</span>
+                                <h3 className="text-foreground font-bold dark:drop-shadow-[0_0_5px_rgba(34,197,94,0.3)]">달성 업적</h3>
                             </div>
-                            <p className="text-gray-400 text-xs mb-3">특별 보상 획득</p>
+                            <p className="text-muted-foreground text-xs mb-3">특별 보상 획득</p>
                             <div className="space-y-2">
                                 {achievements.map((ach, idx) => (
                                     <div key={idx} className="flex justify-between items-center">
-                                        <span className="text-gray-300 text-sm">{ach.name}</span>
+                                        <span className="text-muted-foreground text-sm">{ach.name}</span>
                                         <span className={`text-xs px-2 py-0.5 rounded border ${ach.completed
-                                            ? 'bg-green-500/20 text-green-400 border-green-500/50 shadow-[0_0_5px_rgba(34,197,94,0.3)]'
-                                            : 'bg-yellow-500/20 text-yellow-400 border-yellow-500/50'
+                                            ? 'bg-green-500/20 text-green-500 border-green-500/50 dark:shadow-[0_0_5px_rgba(34,197,94,0.3)]'
+                                            : 'bg-yellow-500/20 text-yellow-500 border-yellow-500/50'
                                             }`}>
                                             {ach.progress}
                                         </span>
@@ -109,7 +109,7 @@ export default function RankingPage() {
                 </div>
 
                 {/* Podium */}
-                <div className="bg-[#0F0F12] border border-white/10 rounded-2xl p-6">
+                <div className="bg-card border border-border rounded-2xl p-6">
                     <div className="flex justify-center items-end gap-4 mt-8">
                         {/* 2nd Place */}
                         <div className="flex flex-col items-center z-10">
@@ -121,8 +121,8 @@ export default function RankingPage() {
                                     2
                                 </div>
                             </div>
-                            <p className="text-white font-bold text-sm shadow-black drop-shadow-md">{topRankers[0].name}</p>
-                            <p className="text-gray-400 text-xs mb-1">{topRankers[0].items}개 아이템 장착</p>
+                            <p className="text-foreground font-bold text-sm shadow-black drop-shadow-md">{topRankers[0].name}</p>
+                            <p className="text-muted-foreground text-xs mb-1">{topRankers[0].items}개 아이템 장착</p>
                             <p className="text-green-400 text-sm font-medium">↗ {topRankers[0].profit}</p>
 
                             {/* Podium Block */}
@@ -145,8 +145,8 @@ export default function RankingPage() {
                                     {topRankers[1].avatar}
                                 </div>
                             </div>
-                            <p className="text-white font-bold text-lg shadow-black drop-shadow-md">{topRankers[1].name}</p>
-                            <p className="text-gray-400 text-xs mb-1">{topRankers[1].items}개 아이템 장착</p>
+                            <p className="text-foreground font-bold text-lg shadow-black drop-shadow-md">{topRankers[1].name}</p>
+                            <p className="text-muted-foreground text-xs mb-1">{topRankers[1].items}개 아이템 장착</p>
                             <div className="px-3 py-1 bg-yellow-500/20 border border-yellow-500/50 rounded-full mb-1">
                                 <p className="text-green-400 text-sm font-bold">↗ {topRankers[1].profit}</p>
                             </div>
@@ -176,8 +176,8 @@ export default function RankingPage() {
                                     3
                                 </div>
                             </div>
-                            <p className="text-white font-bold text-sm shadow-black drop-shadow-md">{topRankers[2].name}</p>
-                            <p className="text-gray-400 text-xs mb-1">{topRankers[2].items}개 아이템 장착</p>
+                            <p className="text-foreground font-bold text-sm shadow-black drop-shadow-md">{topRankers[2].name}</p>
+                            <p className="text-muted-foreground text-xs mb-1">{topRankers[2].items}개 아이템 장착</p>
                             <p className="text-green-400 text-sm font-medium">↗ {topRankers[2].profit}</p>
 
                             {/* Podium Block */}
@@ -197,32 +197,32 @@ export default function RankingPage() {
 
             {/* Sticky "My Ranking" Footer */}
             {isRankingJoined && (
-                <div className="shrink-0 p-4 border-t border-purple-500/30 bg-[#16161d] relative overflow-hidden">
+                <div className="shrink-0 p-4 border-t border-purple-500/30 bg-card relative overflow-hidden">
                     {/* Background Glow */}
-                    <div className="absolute inset-0 bg-purple-900/10"></div>
+                    <div className="absolute inset-0 bg-purple-900/10 dark:bg-purple-900/10"></div>
                     <div className="absolute top-0 inset-x-0 h-[1px] bg-purple-500 shadow-[0_0_15px_rgba(168,85,247,0.8)]"></div>
 
                     <div className="relative z-10 flex items-center justify-between max-w-4xl mx-auto">
                         <div className="flex items-center gap-4">
                             {/* My Rank */}
-                            <div className="w-12 h-12 rounded-full border-2 border-purple-500 flex items-center justify-center bg-purple-900/50 text-white font-bold text-lg shadow-[0_0_10px_rgba(168,85,247,0.5)]">
+                            <div className="w-12 h-12 rounded-full border-2 border-purple-500 flex items-center justify-center bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-white font-bold text-lg shadow-[0_0_10px_rgba(168,85,247,0.5)]">
                                 {stats.rank}
                             </div>
 
                             {/* My Avatar & Name */}
                             <div className="flex items-center gap-3">
                                 <div className="relative w-10 h-10">
-                                    <img src={profile.avatar} alt="Me" className="w-full h-full rounded-full border border-white/20 object-cover" />
+                                    <img src={profile.avatar} alt="Me" className="w-full h-full rounded-full border border-border object-cover" />
                                     {items.find(i => i.name === "황금 왕관" && i.isEquipped) && (
                                         <div className="absolute -top-3 -right-2 text-xl drop-shadow filter">👑</div>
                                     )}
                                 </div>
                                 <div>
                                     <div className="flex items-center gap-2">
-                                        <p className="text-white font-bold">{profile.nickname}</p>
+                                        <p className="text-foreground font-bold">{profile.nickname}</p>
                                         <span className="text-[10px] bg-purple-500 text-white px-1.5 py-0.5 rounded-full font-bold">ME</span>
                                     </div>
-                                    <p className="text-gray-400 text-xs">상위 5% • 전일 대비 ▲ 3위</p>
+                                    <p className="text-muted-foreground text-xs">상위 5% • 전일 대비 ▲ 3위</p>
                                 </div>
                             </div>
                         </div>
@@ -230,12 +230,12 @@ export default function RankingPage() {
                         {/* My Stats */}
                         <div className="flex items-center gap-8">
                             <div className="text-right">
-                                <p className="text-gray-400 text-xs">수익률</p>
-                                <p className="text-green-400 font-bold font-mono">{stats.profit}</p>
+                                <p className="text-muted-foreground text-xs">수익률</p>
+                                <p className="text-green-500 font-bold font-mono">{stats.profit}</p>
                             </div>
                             <div className="text-right">
-                                <p className="text-gray-400 text-xs">보유 아이템</p>
-                                <p className="text-white font-bold">{items.length}개</p>
+                                <p className="text-muted-foreground text-xs">보유 아이템</p>
+                                <p className="text-foreground font-bold">{items.length}개</p>
                             </div>
                         </div>
                     </div>

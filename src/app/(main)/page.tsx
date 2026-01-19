@@ -15,9 +15,9 @@ export default function DashboardPage() {
         <div className="h-full w-full overflow-y-auto overflow-x-hidden">
             <div className="grid grid-cols-1 lg:grid-cols-[1.3fr_0.8fr_0.7fr] gap-4 h-full p-2">
                 {/* Column 1 (Left) */}
-                <div className="flex flex-col gap-6 h-full min-w-0">
+                <div className="flex flex-col gap-2 h-full min-w-0">
                     {/* Top: Chart */}
-                    <div className="flex-[1.5] min-h-[300px]">
+                    <div className="flex-[1.3] min-h-[300px]">
                         <AssetChart />
                     </div>
                     {/* Bottom: Total Asset & Portfolio */}

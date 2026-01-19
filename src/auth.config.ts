@@ -11,15 +11,17 @@ export const authConfig = {
             const isOnOnboarding = nextUrl.pathname.startsWith('/onboarding');
 
             // 1. Protect Dashboard (Main Route)
+            // 1. Protect Dashboard (Main Route)
             if (isOnDashboard) {
-                if (isLoggedIn) return true;
-                return false; // Redirect unauthenticated users to login page
+                // Delegated to client-side AuthGuard for token-based auth
+                return true;
             }
 
             // 2. Protect Onboarding
+            // 2. Protect Onboarding
             if (isOnOnboarding) {
-                if (isLoggedIn) return true;
-                return false;
+                // Delegated to client-side AuthGuard
+                return true;
             }
 
             // 3. Redirect authenticated users away from Login page

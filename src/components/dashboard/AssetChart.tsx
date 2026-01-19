@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import WidgetCard from './WidgetCard';
 import { useStockStore } from '@/stores/stock-store';
 import { createChart, ColorType, CandlestickData, Time, IChartApi, ISeriesApi, CandlestickSeries } from 'lightweight-charts';
+import { useTheme } from 'next-themes';
 
 // Generate initial mock candle data
 function generateMockCandleData(): CandlestickData<Time>[] {
@@ -34,39 +35,47 @@ export default function AssetChart() {
     const ticker = 'AAPL';
     const data = prices[ticker];
     const [candleData, setCandleData] = useState<CandlestickData<Time>[]>([]);
+    const { theme } = useTheme();
 
     // Initialize chart
     useEffect(() => {
         if (!chartContainerRef.current) return;
 
+        const isDark = theme === 'dark';
+        const textColor = isDark ? '#9ca3af' : '#1f2937'; // gray-400 : gray-800
+        const gridColor = isDark ? 'rgba(255, 255, 255, 0.03)' : 'rgba(0, 0, 0, 0.05)';
+        const borderColor = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
+        const crosshairColor = isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.2)';
+        const labelBg = isDark ? '#1e1e24' : '#ffffff';
+
         const chart = createChart(chartContainerRef.current, {
             layout: {
                 background: { type: ColorType.Solid, color: 'transparent' },
-                textColor: '#9ca3af',
+                textColor: textColor,
             },
             grid: {
-                vertLines: { color: 'rgba(255, 255, 255, 0.03)' },
-                horzLines: { color: 'rgba(255, 255, 255, 0.03)' },
+                vertLines: { color: gridColor },
+                horzLines: { color: gridColor },
             },
             width: chartContainerRef.current.clientWidth,
             height: 350,
             timeScale: {
-                borderColor: 'rgba(255, 255, 255, 0.1)',
+                borderColor: borderColor,
                 timeVisible: true,
                 secondsVisible: false,
             },
             rightPriceScale: {
-                borderColor: 'rgba(255, 255, 255, 0.1)',
+                borderColor: borderColor,
             },
             crosshair: {
                 mode: 1,
                 vertLine: {
-                    color: 'rgba(255, 255, 255, 0.2)',
-                    labelBackgroundColor: '#1e1e24',
+                    color: crosshairColor,
+                    labelBackgroundColor: labelBg,
                 },
                 horzLine: {
-                    color: 'rgba(255, 255, 255, 0.2)',
-                    labelBackgroundColor: '#1e1e24',
+                    color: crosshairColor,
+                    labelBackgroundColor: labelBg,
                 },
             },
         });
@@ -104,7 +113,7 @@ export default function AssetChart() {
             resizeObserver.disconnect();
             chart.remove();
         };
-    }, []);
+    }, [theme]); // Re-create chart on theme change
 
     // Update chart with new data (simulate real-time updates)
     useEffect(() => {
@@ -147,22 +156,60 @@ export default function AssetChart() {
 
     return (
         <WidgetCard className="min-h-[350px] flex flex-col">
-            {/* 1. Header Row: Stock Info + Time Selector */}
+            {/* 1. Header Row: Stock Info + Search */}
             <div className="flex justify-between items-center mb-4">
                 <div className="flex items-center gap-3">
-                    <h2 className="text-2xl font-bold text-white">{ticker}</h2>
-                    <span className="text-gray-400 text-sm">Apple Inc.</span>
-                    <span className="text-xs text-gray-500 bg-white/5 px-2 py-0.5 rounded">NASDAQ</span>
+                    <h2 className="text-2xl font-bold text-foreground tracking-tight">{ticker}</h2>
+                    <div className="flex items-center gap-2">
+                        <span className="text-muted-foreground text-sm font-medium">Apple Inc.</span>
+                        <span className="text-[10px] text-muted-foreground bg-secondary px-1.5 py-0.5 rounded">NASDAQ</span>
+                    </div>
                 </div>
 
-                {/* Time Range Selector */}
-                <div className="flex gap-1 bg-white/5 rounded-lg p-1">
+                {/* Search Bar Input */}
+                <div className="relative group">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <svg className="h-4 w-4 text-muted-foreground group-focus-within:text-accent transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                    </div>
+                    <input
+                        type="text"
+                        placeholder="종목 검색 (Search)"
+                        className="bg-secondary/50 hover:bg-secondary focus:bg-background border border-transparent focus:border-accent rounded-xl py-2 pl-9 pr-4 text-xs w-[180px] transition-all outline-none"
+                    />
+                </div>
+            </div>
+
+            {/* 2. Price Row + Time Selector */}
+            <div className="flex justify-between items-end mb-6 border-b border-border pb-4">
+                <div className="flex items-center gap-3">
+                    <span className="text-2xl font-bold text-foreground tracking-tighter">
+                        ${data ? data.price.toLocaleString(undefined, { minimumFractionDigits: 2 }) : '167.20'}
+                    </span>
+                    <div className={`flex flex-col items-start px-2 py-1 rounded-lg ${(data?.change || 0) >= 0
+                        ? 'text-red-500 bg-red-500/10'
+                        : 'text-blue-500 bg-blue-500/10'
+                        }`}>
+                        <div className="flex items-center gap-1">
+                            <span className="text-sm font-bold">
+                                {data ? (data.change > 0 ? '+' : '') + data.change.toFixed(2) : '+17.00'}
+                            </span>
+                            <span className="text-xs font-semibold opacity-90">
+                                ({data ? (data.changePercent > 0 ? '+' : '') + data.changePercent.toFixed(2) : '+11.32'}%)
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Time Range Selector (Moved Here, with Padding, Aligned Bottom) */}
+                <div className="flex bg-secondary p-1 rounded-xl overflow-hidden mb-1">
                     {['1D', '1W', '1M', '3M', '1Y'].map((range) => (
                         <button
                             key={range}
-                            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${range === '1D'
-                                ? 'bg-yellow-500/20 text-yellow-400'
-                                : 'text-gray-500 hover:text-white hover:bg-white/5'
+                            className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${range === '1D'
+                                ? 'bg-background shadow-sm text-foreground'
+                                : 'text-muted-foreground hover:text-foreground hover:bg-background/50'
                                 }`}
                         >
                             {range}
@@ -171,54 +218,38 @@ export default function AssetChart() {
                 </div>
             </div>
 
-            {/* 2. Price Row */}
-            <div className="flex items-center gap-4 mb-4">
-                <span className="text-4xl font-bold text-white">
-                    ${data ? data.price.toFixed(2) : '167.20'}
-                </span>
-                <span className={`font-semibold px-3 py-2 rounded-lg text-sm ${(data?.change || 0) >= 0
-                    ? 'text-green-500 bg-green-500/10'
-                    : 'text-red-500 bg-red-500/10'
-                    }`}>
-                    {data ? (data.change > 0 ? '+' : '') + data.change.toFixed(2) : '+17.00'}
-                    <br />
-                    ({data ? (data.changePercent > 0 ? '+' : '') + data.changePercent.toFixed(2) : '+11.32'}%)
-                </span>
-            </div>
-
             {/* 2. Stats Grid */}
-            <div className="grid grid-cols-6 gap-2.5 mb-4 pb-4 border-b border-white/5 text-sm">
-                <div className="flex flex-col">
-                    <span className="text-gray-500 text-xs mb-0.5">시가(Open)</span>
-                    <span className="text-white font-semibold">${data?.open?.toFixed(2) || '150.20'}</span>
+            <div className="grid grid-cols-6 gap-2 mb-4 pb-4 border-b border-border text-sm">
+                <div className="flex flex-col items-center">
+                    <span className="text-muted-foreground text-xs mb-1">시가(Open)</span>
+                    <span className="text-foreground font-bold tracking-tight">${data?.open?.toFixed(2) || '150.20'}</span>
                 </div>
-                <div className="flex flex-col">
-                    <span className="text-gray-500 text-xs mb-0.5">고가(High)</span>
-                    <span className="text-red-400 font-semibold">${data?.high?.toFixed(2) || '167.85'}</span>
+                <div className="flex flex-col items-center">
+                    <span className="text-muted-foreground text-xs mb-1">고가(High)</span>
+                    <span className="text-red-500 font-bold tracking-tight">${data?.high?.toFixed(2) || '168.00'}</span>
                 </div>
-                <div className="flex flex-col">
-                    <span className="text-gray-500 text-xs mb-0.5">저가(Low)</span>
-                    <span className="text-blue-400 font-semibold">${data?.low?.toFixed(2) || '149.50'}</span>
+                <div className="flex flex-col items-center">
+                    <span className="text-muted-foreground text-xs mb-1">저가(Low)</span>
+                    <span className="text-blue-500 font-bold tracking-tight">${data?.low?.toFixed(2) || '149.50'}</span>
                 </div>
-                <div className="flex flex-col">
-                    <span className="text-gray-500 text-xs mb-0.5">종가(Close)</span>
-                    <span className="text-white font-semibold">${data?.price?.toFixed(2) || '167.20'}</span>
+                <div className="flex flex-col items-center">
+                    <span className="text-muted-foreground text-xs mb-1">종가(Close)</span>
+                    <span className="text-foreground font-bold tracking-tight">${data?.price?.toFixed(2) || '162.02'}</span>
                 </div>
-                <div className="flex flex-col">
-                    <span className="text-gray-500 text-xs mb-0.5">전일가(Prev)</span>
-                    <span className="text-gray-400 font-semibold">$150.20</span>
+                <div className="flex flex-col items-center">
+                    <span className="text-muted-foreground text-xs mb-1">전일가(Prev)</span>
+                    <span className="text-muted-foreground font-bold tracking-tight">$150.20</span>
                 </div>
-                <div className="flex flex-col">
-                    <span className="text-gray-500 text-xs mb-0.5">거래량(Vol)</span>
-                    <span className="text-white font-semibold">{((data?.volume || 45200000) / 1000000).toFixed(1)}M</span>
+                <div className="flex flex-col items-center">
+                    <span className="text-muted-foreground text-xs mb-1">거래량(Vol)</span>
+                    <span className="text-foreground font-bold tracking-tight">{((data?.volume || 45200000) / 1000000).toFixed(1)}M</span>
                 </div>
             </div>
 
             {/* 3. Chart Area */}
             <div
                 ref={chartContainerRef}
-                className="flex-1 w-full min-h-[250px] rounded-lg overflow-hidden"
-                style={{ backgroundColor: '#0a0a0c' }}
+                className="flex-1 w-full min-h-[250px] rounded-lg overflow-hidden bg-background dark:bg-[#0a0a0c]"
             />
         </WidgetCard>
     );

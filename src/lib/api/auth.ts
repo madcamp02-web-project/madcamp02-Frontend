@@ -1,0 +1,44 @@
+import { api } from './index';
+
+export interface LoginParams {
+    email: string;
+    password?: string;
+}
+
+export interface SignupParams {
+    email: string;
+    password?: string;
+    nickname: string;
+}
+
+export const authApi = {
+    // Standard Email Login
+    login: async (credentials: LoginParams) => {
+        const { data } = await api.post('/api/v1/auth/login', credentials);
+        return data;
+    },
+
+    // Signup
+    signup: async (params: SignupParams) => {
+        const { data } = await api.post('/api/v1/auth/signup', params);
+        return data;
+    },
+
+    // Hybrid Auth: Send Kakao Access Token to Backend
+    kakaoLogin: async (accessToken: string) => {
+        const { data } = await api.post('/api/v1/auth/oauth/kakao', { accessToken });
+        return data;
+    },
+
+    // Refresh Token (if manually called)
+    refreshToken: async () => {
+        const { data } = await api.post('/api/v1/auth/refresh');
+        return data;
+    },
+
+    // Check Auth (Me)
+    me: async () => {
+        const { data } = await api.get('/api/v1/user/me');
+        return data;
+    }
+};
