@@ -1,18 +1,33 @@
 "use client";
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import WidgetCard from './WidgetCard';
 import { useUserStore } from '@/stores/user-store';
+import { gameApi } from '@/lib/api/game';
+import { RankingResponse } from '@/types/api';
 
 export default function PersonaRanking() {
-    const { profile, items, stats } = useUserStore();
+    const { profile, items } = useUserStore();
+    const [ranking, setRanking] = React.useState<RankingResponse | null>(null);
 
-    // Mock other rankings
-    const rankings = [
-        { rank: 1, name: "황금손", profit: "+156.32%", color: "bg-yellow-400" },
-        { rank: 2, name: "차트마스터", profit: "+128.45%", color: "bg-gray-300" },
-        { rank: 3, name: "위험한초보", profit: "+98.21%", color: "bg-orange-500" },
-    ];
+    useEffect(() => {
+        gameApi.getRanking()
+            .then(setRanking)
+            .catch(() => {});
+    }, []);
+
+    // Top 3 rankings
+    const rankings = ranking?.items.slice(0, 3).map((item, idx) => {
+        const returnPercent = item.returnPercent ?? 0;
+        return {
+            rank: item.rank,
+            name: item.nickname,
+            profit: `${returnPercent >= 0 ? '+' : ''}${returnPercent.toFixed(2)}%`,
+            color: idx === 0 ? "bg-yellow-400" : idx === 1 ? "bg-gray-300" : "bg-orange-500",
+        };
+    }) || [];
+
+    const myRank = ranking?.my;
 
     return (
         <WidgetCard className="h-full bg-card">
@@ -30,12 +45,16 @@ export default function PersonaRanking() {
 
                             <div className="relative w-full h-full rounded-full p-[2px] bg-gradient-to-b from-yellow-300 via-yellow-500 to-yellow-700 shadow-[0_0_15px_rgba(234,179,8,0.3)]">
                                 <div className="w-full h-full rounded-full bg-background flex items-center justify-center overflow-hidden border-2 border-background">
-                                    <img src={profile.avatar} alt="Avatar" className="w-full h-full object-cover" />
+                                    {profile?.profileImage ? (
+                                        <img src={profile.profileImage} alt="Avatar" className="w-full h-full object-cover" />
+                                    ) : (
+                                        <div className="w-full h-full bg-secondary flex items-center justify-center text-2xl">👤</div>
+                                    )}
                                 </div>
                             </div>
 
                             {/* Equipped Items (Visual) */}
-                            {items.find(i => i.name === "황금 왕관" && i.isEquipped) && (
+                            {items.find(i => i.equipped && i.category === 'AVATAR') && (
                                 <div className="absolute -top-4 -right-2 text-3xl drop-shadow-lg filter rotate-12 z-20">
                                     👑
                                 </div>
@@ -45,15 +64,18 @@ export default function PersonaRanking() {
                         {/* Info */}
                         <div className="flex flex-col min-w-0">
                             <span className="text-accent font-bold text-lg whitespace-nowrap flex items-center gap-1">
-                                {items.find(i => i.name === "반짝이 테두리" && i.isEquipped) ? "✨" : ""}
-                                {profile.nickname}
-                                {items.find(i => i.name === "반짝이 테두리" && i.isEquipped) ? "✨" : ""}
+                                {items.find(i => i.equipped && i.category === 'NAMEPLATE') ? "✨" : ""}
+                                {profile?.nickname || '사용자'}
+                                {items.find(i => i.equipped && i.category === 'NAMEPLATE') ? "✨" : ""}
                             </span>
                             <div className="flex items-center gap-2 mt-0.5">
                                 <span className="bg-accent text-accent-foreground text-[10px] font-bold px-1.5 py-0.5 rounded">Lv.99</span>
                                 <span className="text-muted-foreground text-xs">LEGENDARY INVESTOR</span>
                             </div>
-                            <div className="text-xs text-muted-foreground mt-1">내 랭킹: <span className="text-foreground font-bold">{stats.rank}위</span> (상위 5%)</div>
+                            <div className="text-xs text-muted-foreground mt-1">
+                                내 랭킹: <span className="text-foreground font-bold">{myRank?.rank || '-'}위</span>
+                                {myRank && myRank.returnPercent !== undefined && ` (${myRank.returnPercent >= 0 ? '+' : ''}${myRank.returnPercent.toFixed(2)}%)`}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -83,21 +105,27 @@ export default function PersonaRanking() {
                     ))}
 
                     {/* My Rank Item (Always visible at bottom if not in top 3) */}
-                    <div className="mt-auto border-t border-border pt-2">
-                        <div className="flex items-center gap-3 p-2 rounded-xl bg-secondary/50 border border-accent/20">
-                            <div className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-foreground bg-muted shadow-lg text-xs shrink-0 border border-accent/50">
-                                {stats.rank}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                                <div className="font-bold text-sm text-foreground truncate flex items-center gap-1">
-                                    {profile.nickname} <span className="text-[10px] bg-accent/20 text-accent px-1 rounded">나</span>
+                    {myRank && (
+                        <div className="mt-auto border-t border-border pt-2">
+                            <div className="flex items-center gap-3 p-2 rounded-xl bg-secondary/50 border border-accent/20">
+                                <div className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-foreground bg-muted shadow-lg text-xs shrink-0 border border-accent/50">
+                                    {myRank.rank}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <div className="font-bold text-sm text-foreground truncate flex items-center gap-1">
+                                        {profile?.nickname || '사용자'} <span className="text-[10px] bg-accent/20 text-accent px-1 rounded">나</span>
+                                    </div>
+                                </div>
+                                <div className="text-right shrink-0">
+                                    {myRank && myRank.returnPercent !== undefined && (
+                                        <div className={`font-bold text-sm ${myRank.returnPercent >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                            {myRank.returnPercent >= 0 ? '+' : ''}{myRank.returnPercent.toFixed(2)}%
+                                        </div>
+                                    )}
                                 </div>
                             </div>
-                            <div className="text-right shrink-0">
-                                <div className="font-bold text-green-400 text-sm">{stats.profit}</div>
-                            </div>
                         </div>
-                    </div>
+                    )}
                 </div>
             </div>
         </WidgetCard>

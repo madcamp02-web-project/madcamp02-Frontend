@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { usePortfolioStore } from '@/stores/portfolio-store';
 import { useStockStore } from '@/stores/stock-store';
 
@@ -9,72 +9,46 @@ export default function PortfolioPage() {
     const [selectedCard, setSelectedCard] = useState<'total' | 'invested' | 'evaluation' | 'profit'>('total');
     const [tableTab, setTableTab] = useState<'holdings' | 'history'>('holdings');
 
-    const { holdings, transactions, cash } = usePortfolioStore();
+    const { 
+        summary, 
+        positions, 
+        transactions, 
+        isLoading,
+        fetchPortfolio, 
+        fetchHistory 
+    } = usePortfolioStore();
     const { prices } = useStockStore();
+
+    // 초기 로드
+    useEffect(() => {
+        fetchPortfolio().catch(() => {});
+        fetchHistory().catch(() => {});
+    }, [fetchPortfolio, fetchHistory]);
 
     // --- Derived Data ---
     const holdingsList = useMemo(() => {
-        return Object.values(holdings).map(h => {
-            // Fallback prices if store is empty
-            const fallbackPrices: Record<string, number> = {
-                '005930': 71500,
-                '000660': 132000,
-                '035420': 185000,
-                '005380': 198000,
-                '051910': 420000,
-                'AAPL': 167.20
-            };
-
-            const isUSD = h.ticker === 'AAPL'; // Simple check for now
-            const EXCHANGE_RATE = 1430; // Mock exchange rate
-
-            // Use store price -> fallback price -> avgPrice -> 0
-            let currentPrice = prices[h.ticker]?.price || fallbackPrices[h.ticker] || h.avgPrice || 0;
-
-            // Calculate RAW values (in their native currency)
-            const evalAmount = currentPrice * h.quantity;
-            const investedAmount = h.avgPrice * h.quantity;
-            const profitLoss = evalAmount - investedAmount;
-            const profitPercent = investedAmount > 0 ? (profitLoss / investedAmount) * 100 : 0;
-
-            // Calculate USD converted values for aggregation (Totals/Charts)
-            // If stock is KRW, divide by exchange rate. If USD, keep as is.
-            const evalAmountUSD = isUSD ? evalAmount : evalAmount / EXCHANGE_RATE;
-            const investedAmountUSD = isUSD ? investedAmount : investedAmount / EXCHANGE_RATE;
-            const profitLossUSD = evalAmountUSD - investedAmountUSD;
-
-            // Name mapping
-            const nameMap: Record<string, string> = {
-                '005930': '삼성전자',
-                '000660': 'SK하이닉스',
-                '035420': 'NAVER',
-                '005380': '현대차',
-                '051910': 'LG화학',
-                'AAPL': '애플 (Apple)',
-            };
-
+        return positions.map(pos => {
+            // API에서 받은 데이터 사용 (이미 USD 기준으로 계산됨)
             return {
-                ...h,
-                name: nameMap[h.ticker] || h.ticker,
-                isUSD,
-                currentPrice,
-                evalAmount,
-                investedAmount,
-                profitLoss,
-                profitPercent,
-                // Normalized for sorting/totals (USD BASE)
-                evalAmountUSD,
-                investedAmountUSD,
-                profitLossUSD
+                ticker: pos.ticker,
+                name: pos.ticker, // API에서 이름을 제공하면 추가
+                quantity: pos.quantity,
+                avgPrice: pos.avgPrice,
+                currentPrice: pos.currentPrice,
+                marketValue: pos.marketValue,
+                pnl: pos.pnl,
+                pnlPercent: pos.pnlPercent,
             };
         });
-    }, [holdings, prices]);
+    }, [positions]);
 
-    const totalInvested = holdingsList.reduce((sum, h) => sum + h.investedAmountUSD, 0);
-    const totalEvaluation = holdingsList.reduce((sum, h) => sum + h.evalAmountUSD, 0);
-    const totalAsset = cash + totalEvaluation; // Cash is already USD
-    const totalProfitLoss = totalEvaluation - totalInvested;
-    const totalProfitPercent = totalInvested > 0 ? (totalProfitLoss / totalInvested) * 100 : 0;
+    // Summary에서 총계 정보 사용
+    const totalInvested = holdingsList.reduce((sum, h) => sum + (h.avgPrice * h.quantity), 0);
+    const totalEvaluation = summary?.totalEquity ? summary.totalEquity - (summary.cashBalance || 0) : holdingsList.reduce((sum, h) => sum + h.marketValue, 0);
+    const totalAsset = summary?.totalEquity || 0;
+    const totalProfitLoss = summary?.totalPnl || holdingsList.reduce((sum, h) => sum + h.pnl, 0);
+    const totalProfitPercent = summary?.totalPnlPercent || (totalInvested > 0 ? (totalProfitLoss / totalInvested) * 100 : 0);
+    const cash = summary?.cashBalance || 0;
 
     const statsCards = [
         {
@@ -120,33 +94,34 @@ export default function PortfolioPage() {
         },
     ];
 
-    const sortedTransactions = [...transactions].sort((a, b) => b.timestamp - a.timestamp);
+    const sortedTransactions = [...transactions].sort((a, b) => 
+        new Date(b.tradeDate).getTime() - new Date(a.tradeDate).getTime()
+    );
 
     // Pie Chart Data - Use Normalized USD values
     const pieChartData = holdingsList.map(h => {
-        let color = '#CBD5E1'; // default slate-300
-        if (h.ticker === '005930') color = '#3B82F6'; // Samsung Blue
-        else if (h.ticker === '000660') color = '#F97316'; // SK Orange
-        else if (h.ticker === '035420') color = '#22C55E'; // Naver Green
-        else if (h.ticker === '005380') color = '#1E40AF'; // Hyundai Dark Blue
-        else if (h.ticker === '051910') color = '#E11D48'; // LG Red
-        else if (h.ticker === 'AAPL') color = '#94A3B8'; // Apple Silver
-        else {
-            // Generate a consistent color based on char code
-            const codeSum = h.ticker.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-            const hue = codeSum % 360;
-            color = `hsl(${hue}, 70%, 50%)`;
-        }
+        // Generate a consistent color based on ticker
+        const codeSum = h.ticker.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+        const hue = codeSum % 360;
+        const color = `hsl(${hue}, 70%, 50%)`;
 
         return {
             name: h.name,
-            value: totalEvaluation > 0 ? Math.round((h.evalAmountUSD / totalEvaluation) * 100) : 0,
+            value: totalEvaluation > 0 ? Math.round((h.marketValue / totalEvaluation) * 100) : 0,
             color
         };
     }).sort((a, b) => b.value - a.value);
 
+    if (isLoading && !summary && positions.length === 0) {
+        return (
+            <div className="h-full w-full flex items-center justify-center">
+                <div className="text-muted-foreground">데이터를 불러오는 중...</div>
+            </div>
+        );
+    }
+
     return (
-        <div className="h-full w-full flex flex-col overflow-hidden">
+        <div className="h-full w-full flex flex-col overflow-hidden" suppressHydrationWarning>
             {/* Header */}
             <div className="px-4 pt-2 pb-4 border-b border-border shrink-0">
                 <h1 className="text-2xl font-bold text-foreground">포트폴리오</h1>
@@ -302,20 +277,19 @@ export default function PortfolioPage() {
                                                 </div>
                                                 <div className="text-foreground text-right">{stock.quantity}</div>
                                                 <div className="text-foreground text-right">
-                                                    {stock.isUSD ? '$' : ''}{stock.avgPrice.toLocaleString()}{!stock.isUSD ? '원' : ''}
+                                                    ${(stock.avgPrice ?? 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}
                                                 </div>
                                                 <div className="text-foreground text-right">
-                                                    {stock.isUSD ? '$' : ''}{stock.currentPrice.toLocaleString()}{!stock.isUSD ? '원' : ''}
+                                                    ${(stock.currentPrice ?? 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}
                                                 </div>
                                                 <div className="text-foreground text-right font-medium">
-                                                    ${stock.evalAmountUSD.toLocaleString(undefined, { maximumFractionDigits: 2 })}
-                                                    {!stock.isUSD && <div className="text-xs text-muted-foreground">({stock.evalAmount.toLocaleString()}원)</div>}
+                                                    ${(stock.marketValue ?? 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}
                                                 </div>
-                                                <div className={`text-right font-medium ${stock.profitLossUSD >= 0 ? 'text-red-500' : 'text-blue-500'}`}>
-                                                    {stock.profitLossUSD >= 0 ? '+' : ''}${Math.abs(stock.profitLossUSD).toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                                                <div className={`text-right font-medium ${(stock.pnl ?? 0) >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                                                    {(stock.pnl ?? 0) >= 0 ? '+' : ''}${Math.abs(stock.pnl ?? 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}
                                                 </div>
-                                                <div className={`text-right font-medium ${stock.profitPercent >= 0 ? 'text-red-500' : 'text-blue-500'}`}>
-                                                    {stock.profitPercent >= 0 ? '+' : ''}{stock.profitPercent.toFixed(2)}%
+                                                <div className={`text-right font-medium ${(stock.pnlPercent ?? 0) >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                                                    {(stock.pnlPercent ?? 0) >= 0 ? '+' : ''}{(stock.pnlPercent ?? 0).toFixed(2)}%
                                                 </div>
                                             </div>
                                         ))
@@ -339,20 +313,20 @@ export default function PortfolioPage() {
                                         <div className="text-center py-8 text-muted-foreground text-sm">거래 내역이 없습니다.</div>
                                     ) : (
                                         sortedTransactions.map((trade) => (
-                                            <div key={trade.id} className="grid grid-cols-6 gap-2 py-3 border-b border-border text-sm">
+                                            <div key={trade.logId} className="grid grid-cols-6 gap-2 py-3 border-b border-border text-sm">
                                                 <div>
-                                                    <div className="text-foreground">{new Date(trade.timestamp).toLocaleDateString()}</div>
-                                                    <div className="text-muted-foreground text-xs">{new Date(trade.timestamp).toLocaleTimeString()}</div>
+                                                    <div className="text-foreground">{new Date(trade.tradeDate).toLocaleDateString()}</div>
+                                                    <div className="text-muted-foreground text-xs">{new Date(trade.tradeDate).toLocaleTimeString()}</div>
                                                 </div>
                                                 <div className="text-foreground font-medium">{trade.ticker}</div>
                                                 <div className="text-center">
-                                                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${trade.type === 'buy' ? 'bg-red-500/20 text-red-500' : 'bg-blue-500/20 text-blue-500'}`}>
-                                                        {trade.type === 'buy' ? '매수' : '매도'}
+                                                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${trade.type === 'BUY' ? 'bg-green-500/20 text-green-500' : 'bg-red-500/20 text-red-500'}`}>
+                                                        {trade.type === 'BUY' ? '매수' : '매도'}
                                                     </span>
                                                 </div>
-                                                <div className="text-foreground text-right">{trade.quantity}</div>
-                                                <div className="text-foreground text-right">{trade.price.toLocaleString()}</div>
-                                                <div className="text-foreground text-right font-medium">{(trade.price * trade.quantity).toLocaleString()}</div>
+                                                <div className="text-foreground text-right">{trade.quantity ?? 0}</div>
+                                                <div className="text-foreground text-right">${(trade.price ?? 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}</div>
+                                                <div className="text-foreground text-right font-medium">${(trade.totalAmount ?? 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}</div>
                                             </div>
                                         ))
                                     )}

@@ -30,15 +30,24 @@ export const authApi = {
         return data;
     },
 
+    // Hybrid Auth: Send Google ID Token to Backend
+    googleLogin: async (idToken: string) => {
+        const { data } = await api.post('/api/v1/auth/oauth/google', { 
+            provider: 'google',
+            idToken 
+        });
+        return data;
+    },
+
     // Refresh Token (if manually called)
     refreshToken: async () => {
         const { data } = await api.post('/api/v1/auth/refresh');
         return data;
     },
 
-    // Check Auth (Me)
+    // Check Auth (Me) - 인증 컨텍스트 전용
     me: async () => {
-        const { data } = await api.get('/api/v1/user/me');
+        const { data } = await api.get('/api/v1/auth/me');
         return data;
     }
 };

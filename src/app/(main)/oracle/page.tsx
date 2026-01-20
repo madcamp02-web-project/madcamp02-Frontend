@@ -55,7 +55,7 @@ export default function OraclePage() {
     };
 
     return (
-        <div className="h-full w-full flex flex-col overflow-hidden">
+        <div className="h-full w-full flex flex-col overflow-hidden" suppressHydrationWarning>
             {/* Header */}
             <div className="px-4 pt-2 pb-4 border-b border-border shrink-0">
                 <h1 className="text-2xl font-bold text-foreground">AI 도사 상담소 🧙‍♂️</h1>

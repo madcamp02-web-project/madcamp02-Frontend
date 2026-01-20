@@ -121,6 +121,7 @@ export default function ChatbotPopup() {
         <div
             className="fixed bottom-24 w-[350px] bg-[#16161d] border border-white/20 rounded-2xl shadow-2xl overflow-hidden flex flex-col z-[100] transition-all duration-300 ease-out"
             style={{ right: isSidebarOpen ? '320px' : '2rem' }}
+            suppressHydrationWarning
         >
             {/* Header */}
             <div className="bg-gradient-to-r from-[var(--accent-purple)] to-[#4f46e5] p-3 flex items-center justify-between shrink-0">

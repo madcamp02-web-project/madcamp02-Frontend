@@ -12,6 +12,7 @@ export default function ChatbotButton() {
       after:content-['AI_도사'] after:absolute after:-top-10 after:bg-black/80 after:px-3 after:py-1 after:rounded-md after:text-xs after:text-white after:opacity-0 after:transition-opacity after:pointer-events-none after:whitespace-nowrap hover:after:opacity-100"
       style={{ right: isSidebarOpen ? '312px' : '2rem' }}
       aria-label="AI Oracle Chatbot"
+      suppressHydrationWarning
     >
       <span className="text-[1.75rem]">🔮</span>
     </button>

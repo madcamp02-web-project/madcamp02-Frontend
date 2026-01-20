@@ -16,50 +16,98 @@ export default function OrderPanel({ ticker: tickerProp }: OrderPanelProps) {
     const [orderType, setOrderType] = useState<'market' | 'limit'>('market');
     const [limitPrice, setLimitPrice] = useState<number>(0);
     const [qty, setQty] = useState<number>(0);
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
-    const { cash, holdings, buyStock, sellStock } = usePortfolioStore();
+    const { 
+        availableBalance, 
+        positions, 
+        placeOrder,
+        fetchAvailableBalance,
+    } = usePortfolioStore();
+
+    const { currentQuote, fetchQuote: fetchStockQuote } = useStockStore();
 
     // Determine current ticker
     const ticker = tickerProp || 'AAPL'; // Default to AAPL
-    const isKRW = ['005930', '000660', '035420', '005380', '051910'].includes(ticker);
-    const currencySymbol = isKRW ? '원' : 'USD';
-    const EXCHANGE_RATE = 1430;
 
-    // Get real price from store or fallback
-    const { prices } = useStockStore();
-    const currentPrice = prices[ticker]?.price || (ticker === 'AAPL' ? 167.20 : 71500); // Fallback: AAPL $167, Samsung 71500
+    // 초기 로드
+    useEffect(() => {
+        if (ticker) {
+            fetchStockQuote(ticker).catch(() => {});
+            fetchAvailableBalance().catch(() => {});
+        }
+    }, [ticker, fetchStockQuote, fetchAvailableBalance]);
+
+    // Get real price from store
+    const currentPrice = currentQuote?.price || 0;
 
     useEffect(() => {
-        setLimitPrice(currentPrice);
+        if (currentPrice > 0) {
+            setLimitPrice(currentPrice);
+        }
     }, [currentPrice]);
 
     // Calculate Max Buy/Sell
     const maxBuyQty = useMemo(() => {
         const price = orderType === 'market' ? currentPrice : limitPrice;
-        if (price <= 0) return 0;
+        if (price <= 0 || !availableBalance) return 0;
+        return Math.floor(availableBalance / price);
+    }, [availableBalance, currentPrice, limitPrice, orderType]);
 
-        // Cash is USD. If stock is KRW, convert cash to KRW buying power.
-        const buyingPower = isKRW ? cash * EXCHANGE_RATE : cash;
-        return Math.floor(buyingPower / price);
-    }, [cash, currentPrice, limitPrice, orderType, isKRW]);
+    const maxSellQty = useMemo(() => {
+        const position = positions.find(p => p.ticker === ticker);
+        return position?.quantity || 0;
+    }, [positions, ticker]);
 
-    const maxSellQty = holdings[ticker]?.quantity || 0;
-
-    const handleOrder = () => {
+    const handleOrder = async () => {
         const price = orderType === 'market' ? currentPrice : limitPrice;
-        if (qty <= 0) return;
-
-        if (tab === 'buy') {
-            buyStock(ticker, price, qty);
-        } else {
-            sellStock(ticker, price, qty);
+        if (qty <= 0) {
+            alert('수량을 입력해주세요.');
+            return;
         }
-        // Reset qty after order
-        setQty(0);
+
+        // 매수 시 잔고 확인
+        if (tab === 'buy' && availableBalance !== null && totalAmount > availableBalance) {
+            alert('잔액이 부족합니다.');
+            return;
+        }
+
+        // 매도 시 보유 수량 확인
+        if (tab === 'sell' && qty > maxSellQty) {
+            alert('보유 수량이 부족합니다.');
+            return;
+        }
+
+        setIsSubmitting(true);
+        try {
+            await placeOrder({
+                ticker,
+                type: tab === 'buy' ? 'BUY' : 'SELL',
+                quantity: qty,
+            });
+            // 주문 성공 후 수량 초기화 및 현재가 다시 불러오기
+            setQty(0);
+            await fetchStockQuote(ticker).catch(() => {});
+        } catch (error: any) {
+            const errorCode = error.response?.data?.error;
+            if (errorCode === 'TRADE_001') {
+                alert('잔액이 부족합니다.');
+            } else if (errorCode === 'TRADE_002') {
+                alert('보유 수량이 부족합니다.');
+            } else {
+                const errorMessage = error.response?.data?.message || '주문 처리 중 오류가 발생했습니다.';
+                alert(errorMessage);
+            }
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     // Calculations
-    const totalAmount = (orderType === 'market' ? currentPrice : limitPrice) * qty;
+    const totalAmount = useMemo(() => {
+        const price = orderType === 'market' ? (currentPrice || 0) : (limitPrice || 0);
+        return price * (qty || 0);
+    }, [orderType, currentPrice, limitPrice, qty]);
     const isBuy = tab === 'buy';
 
     return (
@@ -69,7 +117,7 @@ export default function OrderPanel({ ticker: tickerProp }: OrderPanelProps) {
                 <h2 className="text-foreground font-bold text-lg">주문 (Order)</h2>
                 <div className="bg-secondary rounded-full px-3 py-1 text-xs font-semibold text-muted-foreground flex items-center gap-1">
                     <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-                    실시간/Mock
+                    실시간
                 </div>
             </div>
 
@@ -110,16 +158,16 @@ export default function OrderPanel({ ticker: tickerProp }: OrderPanelProps) {
                 <div className="flex flex-col gap-1">
                     {/* Price Input */}
                     <div className="space-y-1">
-                        <label className="text-xs text-muted-foreground ml-1">가격 ({isKRW ? 'KRW' : 'USD'})</label>
+                        <label className="text-xs text-muted-foreground ml-1">가격 (USD)</label>
                         <div className="relative">
                             <input
                                 type="number"
                                 disabled={orderType === 'market'}
-                                value={orderType === 'market' ? currentPrice : limitPrice}
+                                value={orderType === 'market' ? (currentPrice || 0).toFixed(2) : (limitPrice || 0).toFixed(2)}
                                 onChange={(e) => setLimitPrice(Number(e.target.value))}
                                 className={`w-full bg-secondary border border-border rounded-xl pl-4 pr-1 py-2 text-base font-bold outline-none transition-all ${orderType === 'market' ? 'cursor-not-allowed' : 'focus:border-accent'}`}
                             />
-                            <span className="absolute right-6 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">{currencySymbol}</span>
+                            <span className="absolute right-6 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">USD</span>
                         </div>
                     </div>
 
@@ -150,7 +198,9 @@ export default function OrderPanel({ ticker: tickerProp }: OrderPanelProps) {
                     {isBuy && (
                         <div className="flex justify-between items-center text-xs px-1 mt-1">
                             <span className="text-muted-foreground">주문 가능 금액 (USD)</span>
-                            <span className="text-foreground font-bold">${cash.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
+                            <span className="text-foreground font-bold">
+                                ${availableBalance !== null ? availableBalance.toLocaleString(undefined, { maximumFractionDigits: 2 }) : '0.00'}
+                            </span>
                         </div>
                     )}
                 </div>
@@ -167,13 +217,13 @@ export default function OrderPanel({ ticker: tickerProp }: OrderPanelProps) {
                     {/* Action Button */}
                     <Button
                         onClick={handleOrder}
-                        disabled={Number(qty) <= 0 || (isBuy ? Number(qty) > maxBuyQty : Number(qty) > maxSellQty)}
+                        disabled={Number(qty) <= 0 || (isBuy ? Number(qty) > maxBuyQty : Number(qty) > maxSellQty) || isSubmitting}
                         className={`w-full py-1 text-sm font-bold rounded-xl shadow-lg transition-all ${isBuy
                             ? 'bg-red-600 hover:bg-red-500 shadow-red-500/20'
                             : 'bg-blue-600 hover:bg-blue-500 shadow-blue-500/20'
                             }`}
                     >
-                        {isBuy ? '현금 매수' : '현금 매도'}
+                        {isSubmitting ? '처리 중...' : (isBuy ? '현금 매수' : '현금 매도')}
                     </Button>
                 </div>
             </div>

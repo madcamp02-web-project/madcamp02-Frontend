@@ -38,8 +38,9 @@ export default function Sidebar() {
   };
 
   return (
-    <aside className={`${isSidebarOpen ? 'w-[280px] p-6 border-r' : 'w-0 p-0 border-none min-w-0'} h-screen bg-card border-border flex flex-col shrink-0 transition-all duration-300 ease-out overflow-hidden whitespace-nowrap`}>
-      <div className="flex items-center gap-3 mb-8 min-w-[200px]">
+    <aside className={`${isSidebarOpen ? 'w-[280px] p-6 border-r' : 'w-0 p-0 border-none min-w-0'} h-screen bg-card border-border flex flex-col shrink-0 transition-all duration-300 ease-out overflow-y-auto whitespace-nowrap`} suppressHydrationWarning>
+      {/* 상단 고정 영역: 로고 */}
+      <div className="flex items-center gap-3 mb-8 min-w-[200px] shrink-0">
         <div className="text-2xl text-accent">☀️</div>
         <div className="flex flex-col">
           <span className="font-heading font-bold text-base text-foreground">Stock-Persona</span>
@@ -47,7 +48,8 @@ export default function Sidebar() {
         </div>
       </div>
 
-      <div className="mb-8 min-w-[200px]">
+      {/* 상단 고정 영역: 테마 토글 */}
+      <div className="mb-8 min-w-[200px] shrink-0">
         <button
           onClick={toggleTheme}
           className="w-full p-2 bg-secondary border border-border rounded-lg text-muted-foreground text-sm cursor-pointer flex items-center justify-center gap-2 hover:bg-muted transition-colors"
@@ -64,7 +66,8 @@ export default function Sidebar() {
         </button>
       </div>
 
-      <nav className="flex flex-col gap-2 flex-1 min-w-[200px]">
+      {/* 스크롤 가능한 메뉴 영역 */}
+      <nav className="flex flex-col gap-2 flex-1 min-w-[200px] overflow-y-auto min-h-0">
         {menuItems.map((item) => {
           const isActive = item.href === "/"
             ? pathname === "/"
@@ -74,7 +77,7 @@ export default function Sidebar() {
             <Link
               key={item.href}
               href={item.href}
-              className={`flex items-center gap-3 px-4 py-3 rounded-lg text-muted-foreground no-underline text-[15px] transition-all hover:bg-secondary hover:text-foreground ${isActive
+              className={`flex items-center gap-3 px-4 py-3 rounded-lg text-muted-foreground no-underline text-[15px] transition-all hover:bg-secondary hover:text-foreground shrink-0 ${isActive
                 ? "bg-secondary text-accent border-l-[3px] border-accent"
                 : ""
                 }`}
@@ -86,7 +89,8 @@ export default function Sidebar() {
         })}
       </nav>
 
-      <div className="mt-auto pt-6 border-t border-border min-w-[200px]">
+      {/* 하단 고정 영역: 프로필 및 로그아웃 */}
+      <div className="mt-auto pt-6 border-t border-border min-w-[200px] shrink-0">
         <div className="flex items-center gap-3 mb-4">
           <div className="w-9 h-9 bg-accent rounded-full flex items-center justify-center text-lg">👑</div>
           <div className="flex flex-col">

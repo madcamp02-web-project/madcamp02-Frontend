@@ -9,6 +9,7 @@ export default function HamburgerToggle() {
     return (
         <button
             onClick={toggleSidebar}
+            suppressHydrationWarning
             style={{
                 background: 'transparent',
                 border: 'none',

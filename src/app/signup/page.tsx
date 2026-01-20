@@ -4,10 +4,11 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/stores/auth-store";
+import { hasCompletedOnboarding } from "@/lib/utils";
 
 export default function SignupPage() {
     const router = useRouter();
-    const { signup, isLoading, error } = useAuthStore();
+    const { signup, login, checkAuth, isLoading, error, user } = useAuthStore();
     const [formData, setFormData] = useState({
         email: "",
         password: "",
@@ -32,20 +33,29 @@ export default function SignupPage() {
         }
 
         try {
+            // 1단계: 계정 생성
             await signup(formData);
+
+            // 2단계: 방금 생성한 계정으로 자동 로그인
+            await login({ email: formData.email, password: formData.password });
+
+            // 3단계: /user/me 조회로 최신 프로필 동기화
+            await checkAuth();
+            const state = useAuthStore.getState();
+            const needOnboarding = !hasCompletedOnboarding(state.user);
+
             setIsSuccess(true);
-            // Redirect to login after short delay
-            setTimeout(() => {
-                router.push("/login");
-            }, 1500);
+
+            // 4단계: 온보딩 필요 여부에 따라 라우팅
+            router.push(needOnboarding ? "/onboarding" : "/");
         } catch (err) {
-            // Error is already handled by auth-store
-            console.error("Signup failed:", err);
+            // Error는 auth-store에서 셋팅, 여기서는 로컬 로그만 남긴다.
+            console.error("Signup flow failed:", err);
         }
     };
 
     return (
-        <div className="min-h-screen bg-[#0F0F12] text-white flex flex-col items-center justify-center p-4">
+        <div className="min-h-screen bg-[#0F0F12] text-white flex flex-col items-center justify-center p-4" suppressHydrationWarning>
             <div className="w-full max-w-md bg-[#16161d] p-8 rounded-2xl border border-white/10 shadow-xl">
                 <h1 className="text-3xl font-bold text-center mb-6 bg-gradient-to-r from-[var(--accent-gold)] to-orange-500 bg-clip-text text-transparent">
                     회원가입
@@ -60,7 +70,7 @@ export default function SignupPage() {
 
                     {isSuccess && (
                         <div className="bg-green-500/10 border border-green-500/50 text-green-500 text-sm p-3 rounded-xl text-center">
-                            회원가입 성공! 로그인 페이지로 이동합니다...
+                            회원가입 및 로그인 성공! 온보딩 페이지로 이동합니다...
                         </div>
                     )}
                     <div>

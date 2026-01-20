@@ -61,3 +61,7 @@ out/
 # Local History
 .history/
 *.vsix
+
+
+
+.cursor/

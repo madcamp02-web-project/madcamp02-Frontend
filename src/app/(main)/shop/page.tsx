@@ -1,51 +1,34 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useUserStore } from '@/stores/user-store';
+import { gameApi, ItemCategory } from '@/lib/api/game';
+import { GachaResponse } from '@/types/api';
+import GachaResultModal from '@/components/shop/GachaResultModal';
 
-// 가챠 아이템 데이터
-const gachaItems = {
-    name: [
-        { id: 1, name: "별빛 테두리", rarity: "common", image: "✨" },
-        { id: 2, name: "불꽃 이펙트", rarity: "rare", image: "🔥" },
-        { id: 3, name: "무지개 글로우", rarity: "epic", image: "🌈" },
-        { id: 4, name: "황금 왕관 프레임", rarity: "legendary", image: "👑" },
-    ],
-    avatar: [
-        { id: 5, name: "골드 테두리", rarity: "common", image: "🟡" },
-        { id: 6, name: "다이아 프레임", rarity: "rare", image: "💎" },
-        { id: 7, name: "오로라 글로우", rarity: "epic", image: "🌌" },
-        { id: 8, name: "레전드 불꽃", rarity: "legendary", image: "🔱" },
-    ],
-    theme: [
-        { id: 9, name: "다크 모드", rarity: "common", image: "🌙" },
-        { id: 10, name: "네온 시티", rarity: "rare", image: "🌃" },
-        { id: 11, name: "갤럭시 테마", rarity: "epic", image: "🌠" },
-        { id: 12, name: "드래곤 테마", rarity: "legendary", image: "🐉" },
-    ],
-};
+const GACHA_PRICE = 100; // 문서 기준 100 코인 고정
 
 const rarityColors: Record<string, string> = {
-    common: "bg-gray-500",
-    rare: "bg-blue-500",
-    epic: "bg-purple-500",
-    legendary: "bg-yellow-500",
+    COMMON: "bg-gray-500",
+    RARE: "bg-blue-500",
+    EPIC: "bg-purple-500",
+    LEGENDARY: "bg-yellow-500",
 };
 
 const rarityLabels: Record<string, string> = {
-    common: "Common",
-    rare: "Rare",
-    epic: "Epic",
-    legendary: "Legendary",
+    COMMON: "Common",
+    RARE: "Rare",
+    EPIC: "Epic",
+    LEGENDARY: "Legendary",
 };
 
+// 확률 정보 (API에서 제공하지 않을 수 있으므로 상수로 유지)
 const probabilities = [
     { rarity: "Common", color: "bg-gray-400", percent: 60 },
     { rarity: "Rare", color: "bg-blue-400", percent: 25 },
     { rarity: "Epic", color: "bg-purple-400", percent: 12 },
     { rarity: "Legendary", color: "bg-yellow-400", percent: 3 },
 ];
-
-const tabPrices = { name: 500, avatar: 1000, theme: 2000 };
 
 // 테마별 색상 설정
 const themeConfigs = {
@@ -79,23 +62,70 @@ const themeConfigs = {
 };
 
 export default function ShopPage() {
-    const [activeTab, setActiveTab] = useState<'name' | 'avatar' | 'theme'>('name');
-    const [coins, setCoins] = useState(2500);
+    const [activeTab, setActiveTab] = useState<ItemCategory>('NAMEPLATE');
     const [isSpinning, setIsSpinning] = useState(false);
+    const [gachaResult, setGachaResult] = useState<GachaResponse | null>(null);
+    const [showResultModal, setShowResultModal] = useState(false);
+    const [items, setItems] = useState<{ [key in ItemCategory]?: any[] }>({});
+    const [isLoadingItems, setIsLoadingItems] = useState(false);
 
-    const activeTheme = themeConfigs[activeTab];
+    const { wallet, fetchWallet } = useUserStore();
 
-    const handleGacha = () => {
-        const price = tabPrices[activeTab];
-        if (coins >= price) {
-            setIsSpinning(true);
-            setCoins(coins - price);
-            setTimeout(() => setIsSpinning(false), 2000);
+    // 초기 로드
+    useEffect(() => {
+        fetchWallet().catch(() => {});
+        loadItems();
+    }, [fetchWallet]);
+
+    // 탭 변경 시 아이템 로드
+    useEffect(() => {
+        loadItems();
+    }, [activeTab]);
+
+    const loadItems = async () => {
+        setIsLoadingItems(true);
+        try {
+            const response = await gameApi.getItems(activeTab);
+            setItems(prev => ({ ...prev, [activeTab]: response.items }));
+        } catch (error) {
+            console.error('Failed to load items:', error);
+        } finally {
+            setIsLoadingItems(false);
+        }
+    };
+
+    const activeTheme = themeConfigs[activeTab === 'NAMEPLATE' ? 'name' : activeTab === 'AVATAR' ? 'avatar' : 'theme'];
+    const coins = wallet?.coin || 0;
+    const currentItems = items[activeTab] || [];
+
+    const handleGacha = async () => {
+        if (coins < GACHA_PRICE || isSpinning) return;
+
+        setIsSpinning(true);
+        try {
+            const result = await gameApi.gacha(activeTab);
+            setGachaResult(result);
+            setShowResultModal(true);
+            // 지갑 정보 재조회
+            await fetchWallet();
+        } catch (error: any) {
+            const errorCode = error.response?.data?.error;
+            if (errorCode === 'GAME_001') {
+                alert('코인이 부족합니다.');
+            } else if (errorCode === 'GAME_002') {
+                alert('재추첨에 실패했습니다. 모든 아이템이 중복입니다.');
+            } else if (errorCode === 'GAME_003') {
+                alert('가챠 대상 아이템이 없습니다.');
+            } else {
+                alert('가챠 실행 중 오류가 발생했습니다.');
+            }
+        } finally {
+            setIsSpinning(false);
         }
     };
 
     return (
-        <div className="h-full w-full flex flex-col overflow-hidden">
+        <div className="h-full w-full flex flex-col overflow-hidden" suppressHydrationWarning>
             {/* Header */}
             {/* Header */}
             <div className="px-4 pt-2 pb-4 border-b border-border shrink-0">
@@ -116,9 +146,9 @@ export default function ShopPage() {
             <div className="px-4 pt-4">
                 <div className="flex gap-4">
                     {[
-                        { key: 'name' as const, label: '이름 꾸미기', price: 500, glowColor: 'shadow-yellow-500/50', activeBorder: 'border-yellow-500' },
-                        { key: 'avatar' as const, label: '아바타 꾸미기', price: 1000, glowColor: 'shadow-blue-500/50', activeBorder: 'border-blue-500' },
-                        { key: 'theme' as const, label: '테마 꾸미기', price: 2000, glowColor: 'shadow-purple-500/50', activeBorder: 'border-purple-500' },
+                        { key: 'NAMEPLATE' as ItemCategory, label: '이름 꾸미기', glowColor: 'shadow-yellow-500/50', activeBorder: 'border-yellow-500', themeKey: 'name' as const },
+                        { key: 'AVATAR' as ItemCategory, label: '아바타 꾸미기', glowColor: 'shadow-blue-500/50', activeBorder: 'border-blue-500', themeKey: 'avatar' as const },
+                        { key: 'THEME' as ItemCategory, label: '테마 꾸미기', glowColor: 'shadow-purple-500/50', activeBorder: 'border-purple-500', themeKey: 'theme' as const },
                     ].map((tab) => (
                         <button
                             key={tab.key}
@@ -131,16 +161,16 @@ export default function ShopPage() {
                             {/* Active Tab LED Glow */}
                             {activeTab === tab.key && (
                                 <>
-                                    <div className={`absolute inset-0 bg-${tab.key === 'name' ? 'yellow' : tab.key === 'avatar' ? 'blue' : 'purple'}-500/10`}></div>
-                                    <div className={`absolute bottom-0 inset-x-0 h-[2px] bg-${tab.key === 'name' ? 'yellow' : tab.key === 'avatar' ? 'blue' : 'purple'}-400 shadow-[0_0_10px_rgba(255,255,255,0.8)]`}></div>
+                                    <div className={`absolute inset-0 bg-${tab.themeKey === 'name' ? 'yellow' : tab.themeKey === 'avatar' ? 'blue' : 'purple'}-500/10`}></div>
+                                    <div className={`absolute bottom-0 inset-x-0 h-[2px] bg-${tab.themeKey === 'name' ? 'yellow' : tab.themeKey === 'avatar' ? 'blue' : 'purple'}-400 shadow-[0_0_10px_rgba(255,255,255,0.8)]`}></div>
                                     <div className={`absolute inset-0 shadow-[0_0_20px_rgba(255,255,255,0.2)_inset]`}></div>
                                 </>
                             )}
 
                             <div className="relative z-10 flex flex-col items-center gap-1">
                                 <div className={activeTab === tab.key ? 'text-foreground font-bold drop-shadow-md' : 'text-muted-foreground'}>{tab.label}</div>
-                                <div className={`text-xs ${activeTab === tab.key ? themeConfigs[tab.key].color : 'text-muted-foreground'}`}>
-                                    {tab.price} 코인
+                                <div className={`text-xs ${activeTab === tab.key ? themeConfigs[tab.themeKey].color : 'text-muted-foreground'}`}>
+                                    {GACHA_PRICE} 코인
                                 </div>
                             </div>
                         </button>
@@ -200,7 +230,7 @@ export default function ShopPage() {
                                 {/* Coin slot */}
                                 <div className="flex items-center gap-2 bg-black/40 rounded-full px-2 py-1 border border-white/10">
                                     <div className="w-1 h-4 bg-black rounded-full border border-white/20"></div>
-                                    <span className={`${activeTheme.color} font-bold text-sm`}>{tabPrices[activeTab]}</span>
+                                    <span className={`${activeTheme.color} font-bold text-sm`}>{GACHA_PRICE}</span>
                                 </div>
 
                                 {/* Lever */}
@@ -233,8 +263,8 @@ export default function ShopPage() {
                     {/* Pull Button */}
                     <button
                         onClick={handleGacha}
-                        disabled={coins < tabPrices[activeTab] || isSpinning}
-                        className={`mt-4 px-16 py-3 rounded-xl font-bold text-sm transition-all duration-300 transform active:scale-95 ${coins >= tabPrices[activeTab] && !isSpinning
+                        disabled={coins < GACHA_PRICE || isSpinning}
+                        className={`mt-4 px-16 py-3 rounded-xl font-bold text-sm transition-all duration-300 transform active:scale-95 ${coins >= GACHA_PRICE && !isSpinning
                             ? `${activeTheme.btnBg} text-white shadow-[0_0_20px_rgba(0,0,0,0.5)] hover:shadow-[0_0_30px_rgba(255,255,255,0.3)] hover:brightness-110`
                             : 'bg-gray-700 text-gray-400 cursor-not-allowed border border-white/5'
                             }`}
@@ -257,10 +287,16 @@ export default function ShopPage() {
                             <span className={activeTheme.color}>✨</span> 획득 가능 아이템
                         </h3>
                         <div className="space-y-2">
-                            {gachaItems[activeTab].map((item) => (
-                                <div key={item.id} className="flex items-center gap-3 bg-secondary rounded-lg p-2 border border-border hover:border-muted-foreground/30 transition-colors">
+                            {isLoadingItems ? (
+                                <div className="text-center text-muted-foreground py-4 text-sm">로딩 중...</div>
+                            ) : currentItems.length > 0 ? currentItems.map((item) => (
+                                <div key={item.itemId} className="flex items-center gap-3 bg-secondary rounded-lg p-2 border border-border hover:border-muted-foreground/30 transition-colors">
                                     <div className="w-10 h-10 bg-card rounded-lg flex items-center justify-center text-xl shadow-inner">
-                                        {item.image}
+                                        {item.imageUrl ? (
+                                            <img src={item.imageUrl} alt={item.name} className="w-full h-full object-contain" />
+                                        ) : (
+                                            <span>🎁</span>
+                                        )}
                                     </div>
                                     <div className="flex-1">
                                         <p className="text-foreground text-sm font-medium">{item.name}</p>
@@ -269,7 +305,9 @@ export default function ShopPage() {
                                         </span>
                                     </div>
                                 </div>
-                            ))}
+                            )) : (
+                                <div className="text-center text-muted-foreground py-4 text-sm">아이템이 없습니다</div>
+                            )}
                         </div>
                     </div>
 
@@ -290,6 +328,17 @@ export default function ShopPage() {
                     </div>
                 </div>
             </div>
+
+            {/* Gacha Result Modal */}
+            {showResultModal && gachaResult && (
+                <GachaResultModal
+                    result={gachaResult}
+                    onClose={() => {
+                        setShowResultModal(false);
+                        setGachaResult(null);
+                    }}
+                />
+            )}
         </div>
     );
 }
