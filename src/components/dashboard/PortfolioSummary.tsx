@@ -6,61 +6,31 @@ import { usePortfolioStore } from '@/stores/portfolio-store';
 import { useStockStore } from '@/stores/stock-store';
 
 export default function PortfolioSummary() {
-    const { cash, holdings } = usePortfolioStore();
-    const { prices } = useStockStore();
+    const { summary, positions, fetchPortfolio } = usePortfolioStore();
 
-    const EXCHANGE_RATE = 1430;
+    React.useEffect(() => {
+        fetchPortfolio().catch(() => {});
+    }, [fetchPortfolio]);
 
-    // Calculate Total Assets
-    let totalStockValueUSD = 0;
-    const initialInvestedUSD = 10000; // Fixed initial
-
-    const holdingList = Object.values(holdings).map(h => {
-        // Fallback prices
-        const fallbackPrices: Record<string, number> = {
-            '005930': 71500,
-            '000660': 132000,
-            '035420': 185000,
-            '005380': 198000,
-            '051910': 420000,
-            'AAPL': 167.20,
-            'TSLA': 245.80,
-            'NVDA': 460.10,
-            'MSFT': 330.40,
-            'GOOGL': 135.50,
-            'AMZN': 140.20
-        };
-
-        const currentPriceRaw = prices[h.ticker]?.price || fallbackPrices[h.ticker] || h.avgPrice;
-
-        // Check currency (Simple logic: if number is huge, it's KRW)
-        // Or better, use the known KRW list same as OrderPanel
-        const isKRW = ['005930', '000660', '035420', '005380', '051910'].includes(h.ticker);
-
-        // Normalize to USD
-        const currentPriceUSD = isKRW ? currentPriceRaw / EXCHANGE_RATE : currentPriceRaw;
-        const avgPriceUSD = isKRW ? h.avgPrice / EXCHANGE_RATE : h.avgPrice; // h.avgPrice in store is raw local currency
-
-        const currentValueUSD = currentPriceUSD * h.quantity;
-        totalStockValueUSD += currentValueUSD;
-
-        const gainLossUSD = currentValueUSD - (avgPriceUSD * h.quantity);
-        const gainLossPercent = ((currentPriceUSD - avgPriceUSD) / avgPriceUSD) * 100;
-
+    const holdingList = positions.map(pos => {
+        const avgPrice = pos.avgPrice ?? 0;
+        const marketValue = pos.marketValue ?? 0;
+        const pnlPercent = pos.pnlPercent ?? 0;
         return {
-            s: h.ticker,
-            n: h.ticker,
-            q: `${h.quantity}주`,
-            avg: `$${avgPriceUSD.toLocaleString(undefined, { maximumFractionDigits: 2 })}`,
-            p: `$${currentValueUSD.toLocaleString(undefined, { maximumFractionDigits: 2 })}`,
-            y: `${gainLossPercent >= 0 ? '+' : ''}${gainLossPercent.toFixed(2)}%`,
-            isGain: gainLossPercent >= 0
+            s: pos.ticker,
+            n: pos.ticker, // API에서 이름을 제공하면 추가
+            q: `${pos.quantity ?? 0}주`,
+            avg: `$${avgPrice.toLocaleString(undefined, { maximumFractionDigits: 2 })}`,
+            p: `$${marketValue.toLocaleString(undefined, { maximumFractionDigits: 2 })}`,
+            y: `${pnlPercent >= 0 ? '+' : ''}${pnlPercent.toFixed(2)}%`,
+            isGain: pnlPercent >= 0
         };
     });
 
-    const totalAssetUSD = cash + totalStockValueUSD;
-    const totalGainUSD = totalAssetUSD - initialInvestedUSD;
-    const totalGainPercent = (totalGainUSD / initialInvestedUSD) * 100;
+    const totalAssetUSD = summary?.totalEquity || 0;
+    const totalGainUSD = summary?.totalPnl || 0;
+    const totalGainPercent = summary?.totalPnlPercent || 0;
+    const cash = summary?.cashBalance || 0;
 
     return (
         <WidgetCard title="내 포트폴리오" className="h-full">

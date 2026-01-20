@@ -30,6 +30,15 @@ export const authApi = {
         return data;
     },
 
+    // Hybrid Auth: Send Google ID Token to Backend
+    googleLogin: async (idToken: string) => {
+        const { data } = await api.post('/api/v1/auth/oauth/google', { 
+            provider: 'google',
+            idToken 
+        });
+        return data;
+    },
+
     // Refresh Token (if manually called)
     refreshToken: async () => {
         const { data } = await api.post('/api/v1/auth/refresh');

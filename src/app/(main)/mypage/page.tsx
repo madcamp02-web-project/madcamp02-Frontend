@@ -1,6 +1,6 @@
 "use client";
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useUserStore } from "@/stores/user-store";
 
 export default function MyPage() {
@@ -8,17 +8,28 @@ export default function MyPage() {
     const {
         profile,
         items,
-        stats,
+        wallet,
         isPublic,
         isRankingJoined,
+        isLoading,
+        fetchProfile,
+        fetchInventory,
+        fetchWallet,
         toggleEquip,
         updateProfile,
         setPublicProfile,
         setRankingJoined
     } = useUserStore();
 
+    // 초기 로드
+    useEffect(() => {
+        fetchProfile().catch(() => {});
+        fetchInventory().catch(() => {});
+        fetchWallet().catch(() => {});
+    }, [fetchProfile, fetchInventory, fetchWallet]);
+
     return (
-        <div className="h-full w-full flex flex-col overflow-hidden bg-background">
+        <div className="h-full w-full flex flex-col overflow-hidden bg-background" suppressHydrationWarning>
             {/* Header */}
             <div className="px-6 py-4 border-b border-border shrink-0 flex justify-between items-center bg-background">
                 <div>
@@ -29,8 +40,12 @@ export default function MyPage() {
                 </div>
                 <div className="text-right">
                     <p className="text-muted-foreground text-xs">보유 코인</p>
-                    <p className="text-yellow-500 dark:text-yellow-400 font-bold text-xl">{stats.coins.toLocaleString()}</p>
-                    <p className="text-green-500 dark:text-green-400 text-xs text-right font-medium">총 수익률 {stats.profit}</p>
+                    <p className="text-yellow-500 dark:text-yellow-400 font-bold text-xl">
+                        {wallet?.coin !== undefined ? wallet.coin.toLocaleString() : '0'}
+                    </p>
+                    <p className="text-green-500 dark:text-green-400 text-xs text-right font-medium">
+                        총 자산 ${wallet?.totalAsset !== undefined ? wallet.totalAsset.toLocaleString(undefined, { maximumFractionDigits: 2 }) : '0'}
+                    </p>
                 </div>
             </div>
 
@@ -46,14 +61,20 @@ export default function MyPage() {
                             <div className="relative w-48 h-48 mb-6 group">
                                 <div className="absolute inset-0 bg-yellow-500/20 rounded-full blur-2xl group-hover:bg-yellow-500/30 transition-all duration-500"></div>
                                 <div className="relative w-full h-full rounded-full border-4 border-yellow-500 overflow-hidden shadow-[0_0_30px_rgba(234,179,8,0.4)]">
-                                    <img
-                                        src={profile.avatar}
-                                        alt="Avatar"
-                                        className="w-full h-full object-cover"
-                                    />
+                                    {profile?.profileImage ? (
+                                        <img
+                                            src={profile.profileImage}
+                                            alt="Avatar"
+                                            className="w-full h-full object-cover"
+                                        />
+                                    ) : (
+                                        <div className="w-full h-full bg-secondary flex items-center justify-center text-4xl">
+                                            👤
+                                        </div>
+                                    )}
                                 </div>
                                 {/* Equipped Item Overlays (Visual Only) */}
-                                {items.find(i => i.name === "황금 왕관" && i.isEquipped) && (
+                                {items.find(i => i.equipped && i.category === 'AVATAR') && (
                                     <div className="absolute -top-6 -right-2 text-6xl drop-shadow-lg filter rotate-12 animate-bounce">
                                         👑
                                     </div>
@@ -61,11 +82,17 @@ export default function MyPage() {
                             </div>
 
                             <h3 className="text-2xl font-bold text-foreground mb-2 flex items-center gap-2">
-                                ✨ {profile.nickname} ✨
+                                ✨ {profile?.nickname || '사용자'} ✨
                             </h3>
                             <div className="flex gap-2 text-2xl">
-                                {items.filter(i => i.isEquipped).map(item => (
-                                    <span key={item.id} title={item.name}>{item.image}</span>
+                                {items.filter(i => i.equipped).map(item => (
+                                    <span key={item.itemId} title={item.name}>
+                                        {item.imageUrl ? (
+                                            <img src={item.imageUrl} alt={item.name} className="w-6 h-6 object-contain" />
+                                        ) : (
+                                            <span>🎁</span>
+                                        )}
+                                    </span>
                                 ))}
                             </div>
 
@@ -84,26 +111,30 @@ export default function MyPage() {
                             <div>
                                 <h3 className="text-muted-foreground text-xs font-medium mb-2 uppercase tracking-wider">장착 중인 아이템</h3>
                                 <div className="space-y-2">
-                                    {items.filter(i => i.isEquipped).map(item => (
-                                        <div key={item.id} className="bg-secondary border border-border rounded-xl p-3 flex items-center justify-between group hover:bg-muted transition-colors">
+                                    {items.filter(i => i.equipped).map(item => (
+                                        <div key={item.itemId} className="bg-secondary border border-border rounded-xl p-3 flex items-center justify-between group hover:bg-muted transition-colors">
                                             <div className="flex items-center gap-3">
                                                 <div className="w-10 h-10 bg-black/5 dark:bg-black/30 rounded-lg flex items-center justify-center text-xl border border-border">
-                                                    {item.image}
+                                                    {item.imageUrl ? (
+                                                        <img src={item.imageUrl} alt={item.name} className="w-full h-full object-contain" />
+                                                    ) : (
+                                                        <span>🎁</span>
+                                                    )}
                                                 </div>
                                                 <div>
                                                     <p className="text-foreground font-medium text-sm">{item.name}</p>
-                                                    <p className="text-xs text-muted-foreground capitalize">{item.type}</p>
+                                                    <p className="text-xs text-muted-foreground capitalize">{item.category}</p>
                                                 </div>
                                             </div>
                                             <button
-                                                onClick={() => toggleEquip(item.id)}
+                                                onClick={() => toggleEquip(item.itemId)}
                                                 className="px-3 py-1 bg-black/5 dark:bg-white/10 text-destructive dark:text-white text-xs rounded-lg hover:bg-black/10 dark:hover:bg-white/20 border border-border transition-colors"
                                             >
                                                 해제
                                             </button>
                                         </div>
                                     ))}
-                                    {items.filter(i => i.isEquipped).length === 0 && (
+                                    {items.filter(i => i.equipped).length === 0 && (
                                         <div className="text-center py-4 text-muted-foreground text-sm italic">
                                             장착된 아이템이 없습니다.
                                         </div>
@@ -117,19 +148,23 @@ export default function MyPage() {
                             <div>
                                 <h3 className="text-muted-foreground text-xs font-medium mb-2 uppercase tracking-wider">미장착 아이템</h3>
                                 <div className="space-y-2">
-                                    {items.filter(i => !i.isEquipped).map(item => (
-                                        <div key={item.id} className="bg-secondary border border-border rounded-xl p-3 flex items-center justify-between group hover:border-yellow-500/50 transition-all">
+                                    {items.filter(i => !i.equipped).map(item => (
+                                        <div key={item.itemId} className="bg-secondary border border-border rounded-xl p-3 flex items-center justify-between group hover:border-yellow-500/50 transition-all">
                                             <div className="flex items-center gap-3">
                                                 <div className="w-10 h-10 bg-black/5 dark:bg-black/30 rounded-lg flex items-center justify-center text-xl border border-border">
-                                                    {item.image}
+                                                    {item.imageUrl ? (
+                                                        <img src={item.imageUrl} alt={item.name} className="w-full h-full object-contain" />
+                                                    ) : (
+                                                        <span>🎁</span>
+                                                    )}
                                                 </div>
                                                 <div>
                                                     <p className="text-muted-foreground dark:text-gray-300 font-medium text-sm group-hover:text-foreground dark:group-hover:text-white transition-colors">{item.name}</p>
-                                                    <p className="text-xs text-muted-foreground capitalize">{item.type}</p>
+                                                    <p className="text-xs text-muted-foreground capitalize">{item.category}</p>
                                                 </div>
                                             </div>
                                             <button
-                                                onClick={() => toggleEquip(item.id)}
+                                                onClick={() => toggleEquip(item.itemId)}
                                                 className="px-3 py-1 bg-yellow-500 text-black font-bold text-xs rounded-lg hover:bg-yellow-400 shadow-md shadow-yellow-500/10 transition-all"
                                             >
                                                 장착
@@ -151,7 +186,7 @@ export default function MyPage() {
                                     <label className="block text-muted-foreground text-xs mb-1.5">닉네임</label>
                                     <input
                                         type="text"
-                                        value={profile.nickname}
+                                        value={profile?.nickname || ''}
                                         onChange={(e) => updateProfile({ nickname: e.target.value })}
                                         className="w-full bg-secondary border border-border rounded-xl px-4 py-3 text-foreground text-sm outline-none focus:border-purple-500 transition-colors"
                                     />
@@ -160,7 +195,7 @@ export default function MyPage() {
                                     <label className="block text-muted-foreground text-xs mb-1.5">이메일</label>
                                     <input
                                         type="email"
-                                        value={profile.email}
+                                        value={profile?.email || ''}
                                         onChange={(e) => updateProfile({ email: e.target.value })}
                                         className="w-full bg-secondary border border-border rounded-xl px-4 py-3 text-foreground text-sm outline-none focus:border-purple-500 transition-colors"
                                     />
@@ -170,7 +205,7 @@ export default function MyPage() {
                                         <label className="block text-muted-foreground text-xs mb-1.5">생년월일 (사주 계산)</label>
                                         <input
                                             type="date"
-                                            value={profile.birthDate}
+                                            value={profile?.birthDate || ''}
                                             onChange={(e) => updateProfile({ birthDate: e.target.value })}
                                             className="w-full bg-secondary border border-border rounded-xl px-4 py-3 text-foreground text-sm outline-none focus:border-purple-500 transition-colors"
                                         />
@@ -179,7 +214,7 @@ export default function MyPage() {
                                         <label className="block text-muted-foreground text-xs mb-1.5">태어난 시각</label>
                                         <input
                                             type="time"
-                                            value={profile.birthTime}
+                                            value={profile?.birthTime || ''}
                                             onChange={(e) => updateProfile({ birthTime: e.target.value })}
                                             className="w-full bg-secondary border border-border rounded-xl px-4 py-3 text-foreground text-sm outline-none focus:border-purple-500 transition-colors"
                                         />

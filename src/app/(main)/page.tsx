@@ -12,7 +12,7 @@ import PersonaRanking from "@/components/dashboard/PersonaRanking";
 // Dashboard Main Page
 export default function DashboardPage() {
     return (
-        <div className="h-full w-full overflow-y-auto overflow-x-hidden">
+        <div className="h-full w-full overflow-y-auto overflow-x-hidden" suppressHydrationWarning>
             <div className="grid grid-cols-1 lg:grid-cols-[1.3fr_0.8fr_0.7fr] gap-4 h-full p-2">
                 {/* Column 1 (Left) */}
                 <div className="flex flex-col gap-2 h-full min-w-0">

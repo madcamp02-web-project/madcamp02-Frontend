@@ -5,13 +5,19 @@ import WidgetCard from './WidgetCard';
 import { usePortfolioStore } from '@/stores/portfolio-store';
 
 export default function RecentTrades() {
-    const { transactions } = usePortfolioStore();
+    const { transactions, fetchHistory } = usePortfolioStore();
 
-    // Sort by timestamp descending
-    const sortedTrades = [...transactions].sort((a, b) => b.timestamp - a.timestamp).slice(0, 10);
+    React.useEffect(() => {
+        fetchHistory().catch(() => {});
+    }, [fetchHistory]);
 
-    const formatTime = (ts: number) => {
-        return new Date(ts).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    // Sort by tradeDate descending
+    const sortedTrades = [...transactions]
+        .sort((a, b) => new Date(b.tradeDate).getTime() - new Date(a.tradeDate).getTime())
+        .slice(0, 10);
+
+    const formatTime = (dateString: string) => {
+        return new Date(dateString).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
     };
 
     return (
@@ -23,22 +29,22 @@ export default function RecentTrades() {
                     </div>
                 ) : (
                     sortedTrades.map((trade) => (
-                        <div key={trade.id} className="flex justify-between items-center p-2 border-b border-border last:border-0 hover:bg-secondary rounded transition-colors shrink-0">
+                        <div key={trade.logId} className="flex justify-between items-center p-2 border-b border-border last:border-0 hover:bg-secondary rounded transition-colors shrink-0">
                             <div className="flex items-center gap-3">
-                                <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${trade.type === 'buy' ? 'bg-red-500/20 text-red-500' : 'bg-blue-500/20 text-blue-500'}`}>
-                                    {trade.type === 'buy' ? '↗' : '↘'}
+                                <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${trade.type === 'BUY' ? 'bg-green-500/20 text-green-500' : 'bg-red-500/20 text-red-500'}`}>
+                                    {trade.type === 'BUY' ? '↗' : '↘'}
                                 </div>
                                 <div>
                                     <div className="font-bold text-sm text-foreground">{trade.ticker}</div>
-                                    <div className="text-xs text-muted-foreground">{formatTime(trade.timestamp)}</div>
+                                    <div className="text-xs text-muted-foreground">{formatTime(trade.tradeDate)}</div>
                                 </div>
                             </div>
                             <div className="text-right">
-                                <div className={`text-xs font-bold ${trade.type === 'buy' ? 'text-red-500' : 'text-blue-500'}`}>
-                                    {trade.type === 'buy' ? '매수' : '매도'}
+                                <div className={`text-xs font-bold ${trade.type === 'BUY' ? 'text-green-500' : 'text-red-500'}`}>
+                                    {trade.type === 'BUY' ? '매수' : '매도'}
                                 </div>
                                 <div className="text-xs text-muted-foreground">
-                                    {trade.quantity}주 @ ${trade.price.toLocaleString()}
+                                    {trade.quantity ?? 0}주 @ ${(trade.price ?? 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}
                                 </div>
                             </div>
                         </div>

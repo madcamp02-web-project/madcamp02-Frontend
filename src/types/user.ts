@@ -4,7 +4,13 @@ export interface User {
     nickname: string;
     profileImage?: string;
     provider: 'EMAIL' | 'GOOGLE' | 'KAKAO';
+    birthDate?: string;
+    birthTime?: string;
+    gender?: 'MALE' | 'FEMALE' | 'OTHER';
+    calendarType?: 'SOLAR' | 'LUNAR' | 'LUNAR_LEAP';
     saju?: SajuInfo;
+    isPublic?: boolean;
+    isRankingJoined?: boolean;
 }
 
 export interface SajuInfo {

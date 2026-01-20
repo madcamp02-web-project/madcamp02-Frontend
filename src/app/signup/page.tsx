@@ -45,7 +45,7 @@ export default function SignupPage() {
     };
 
     return (
-        <div className="min-h-screen bg-[#0F0F12] text-white flex flex-col items-center justify-center p-4">
+        <div className="min-h-screen bg-[#0F0F12] text-white flex flex-col items-center justify-center p-4" suppressHydrationWarning>
             <div className="w-full max-w-md bg-[#16161d] p-8 rounded-2xl border border-white/10 shadow-xl">
                 <h1 className="text-3xl font-bold text-center mb-6 bg-gradient-to-r from-[var(--accent-gold)] to-orange-500 bg-clip-text text-transparent">
                     회원가입

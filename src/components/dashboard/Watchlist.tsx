@@ -1,15 +1,28 @@
 "use client";
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import WidgetCard from './WidgetCard';
+import { useStockStore } from '@/stores/stock-store';
 
 export default function Watchlist() {
-    const stocks = [
-        { t: 'AAPL', n: 'Apple', p: '$167.20', c: '+3.15%', up: true },
-        { t: 'TSLA', n: 'Tesla', p: '$242.80', c: '-1.30%', up: false },
-        { t: 'NVDA', n: 'NVIDIA', p: '$485.30', c: '+2.65%', up: true },
-        { t: 'MSFT', n: 'Microsoft', p: '$378.90', c: '+0.61%', up: true }
-    ];
+    const { watchlist, prices, loadWatchlist } = useStockStore();
+
+    useEffect(() => {
+        loadWatchlist().catch(() => {});
+    }, [loadWatchlist]);
+
+    const stocks = watchlist.map(ticker => {
+        const price = prices[ticker];
+        const changePercent = price?.changePercent || 0;
+        const priceValue = price?.price;
+        return {
+            t: ticker,
+            n: ticker, // API에서 이름을 제공하면 추가
+            p: priceValue !== undefined ? `$${priceValue.toFixed(2)}` : '$0.00',
+            c: `${changePercent >= 0 ? '+' : ''}${changePercent.toFixed(2)}%`,
+            up: changePercent >= 0,
+        };
+    });
 
     return (
         <WidgetCard title="관심 종목" action={<span className="text-yellow-500">★</span>} className="h-full">

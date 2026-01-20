@@ -1,6 +1,6 @@
 # 🎨 MadCamp02: 프론트엔드 개발 계획서
 
-**Ver 2.7.12 - Frontend Development Blueprint (Spec-Driven Alignment)**
+**Ver 2.7.13 - Frontend Development Blueprint (Spec-Driven Alignment)**
 
 ---
 
@@ -24,6 +24,7 @@
 | **2.7.10** | **2026-01-19** | **Phase 5 백엔드 구현 완료 연동 안내(Shop/Gacha/Inventory/Ranking)** | **MadCamp02** |
 | **2.7.11** | **2026-01-19** | **프론트 2.7.11 스냅샷 + Phase 5 완료 기반 “Phase 5.5: 프론트 연동·DB 제약 보강” 체크리스트 고정(Shop/Gacha/Inventory/Ranking 실데이터 전환, `{items:[]}`·카테고리/ETF/STOMP 정합성 재확인)** | **MadCamp02** |
 | **2.7.12** | **2026-01-19** | **백엔드 Phase 4~6 구현 기준 Trade/Portfolio/Game/Realtime(WebSocket) DTO·에러 처리·토픽/endpoint 문구를 FULL_SPEC 및 BACKEND 계획서와 정합하게 보정** | **MadCamp02** |
+| **2.7.13** | **2026-01-19** | **Phase 3.6: 백엔드 Redis 캐싱 확장 및 프론트엔드 이중 캐싱 전략 수립 (X-Cache-Status 헤더 처리)** | **MadCamp02** |
 
 ### Ver 2.6 주요 변경 사항
 
@@ -509,13 +510,49 @@ Zustand를 사용하여 전역 상태를 효율적으로 관리하고 컴포넌�
 
 ### 🟡 Phase 2: 기능 연동 (예정)
 
+#### Phase 2.1: 백엔드 Redis 캐싱 연계 (Phase 3.6) 🆕
+
+**목표**: 백엔드 Redis 캐싱과 프론트엔드 localStorage 캐싱의 이중 보호 전략 완성
+
+**구현 항목**:
+- [x] **응답 헤더 처리**: `X-Cache-Status`, `X-Cache-Age`, `X-Data-Freshness` 헤더 파싱 ✅
+  - `HIT`: 백엔드 Redis 캐시에서 조회됨 (빠른 응답)
+  - `MISS`: 외부 API 호출됨 (정상 응답)
+  - `STALE`: 만료된 데이터지만 사용 가능 (백엔드 Stale 캐시 사용)
+- [x] **캐시 상태 UI 표시**: ✅
+  - `STALE` 상태일 때 "캐시된 데이터" 알림 표시 (파란색 배지)
+  - `HIT` 상태일 때는 조용히 표시 (사용자에게 불필요한 정보)
+- [x] **Axios Interceptor 개선**: ✅
+  - 응답 헤더를 확인하여 캐시 상태를 `stock-store`에 저장
+  - `X-Cache-Status: STALE`일 때는 에러로 처리하지 않음
+- [x] **캐시 동기화**: ✅
+  - 백엔드에서 최신 데이터를 받으면 프론트엔드 localStorage 캐시도 업데이트
+  - 백엔드 Stale 데이터를 받아도 프론트엔드 캐시는 유지 (다음 API 호출 시 사용)
+
+**구현 완료**: 2026-01-19  
+**검증 문서**: `docs/PHASE_2.1_IMPLEMENTATION_VERIFICATION.md`
+
+**예상 효과**:
+- 백엔드 Redis 캐시 Hit 시: 네트워크 지연 최소화
+- 백엔드 API 실패 시: Stale 데이터로 서비스 지속성 보장
+- 프론트엔드 localStorage: 백엔드도 실패할 경우 최후의 방어선
+
+### 🟡 Phase 2: 기능 연동 (예정)
+
 - [ ] 페이지별 실데이터 치환(현 Mock → API)
   - `/market`: indices/news/movers
-  - `/trade`: search/candles/orderbook + 주문
+  - `/trade`: search/candles/orderbook + 주문 + **watchlist 조회/추가/삭제**
   - `/portfolio`: portfolio/history
   - `/shop`: items/gacha/inventory/equip (백엔드 Phase 5 완료, 실제 연동 가능)
   - `/ranking`: ranking (백엔드 Phase 5 완료, 실제 연동 가능)
   - `/mypage`: user/me 업데이트 + 공개/랭킹참여 토글
+- [ ] **Watchlist API 연동**
+  - `GET /api/v1/user/watchlist`: 관심종목 조회
+  - `POST /api/v1/user/watchlist`: 관심종목 추가
+  - `DELETE /api/v1/user/watchlist/{ticker}`: 관심종목 삭제
+  - `stock-store.ts`에 `watchlist: string[]` 상태 및 `loadWatchlist()`, `addToWatchlist()`, `removeFromWatchlist()` 액션 추가
+  - `/trade` 페이지 왼쪽 사이드바에 관심종목 리스트 표시
+  - `/market` 페이지에 "내 관심종목" 섹션 추가
 - [ ] 스토어(`stores/*`)를 API 응답 타입에 맞게 재정의 및 전역 동기화
 
 ### 🟢 Phase 3: 실시간 & 최적화 (예정)
@@ -523,6 +560,16 @@ Zustand를 사용하여 전역 상태를 효율적으로 관리하고 컴포넌�
 - [ ] WebSocket(STOMP) 연결 및 실시간 주가/체결 반영 (문서 토픽 기준)
   - Endpoint/Topic 정합성: `/ws-stomp`, `/topic/*`, `/user/queue/*`
   - 동적 구독 관리: 페이지 진입 시 구독, 이탈 시 해제 (백엔드 LRU 전략과 협력)
+- [ ] **`/topic/stock.indices` 구독 및 실시간 업데이트**
+  - `/market` 페이지 진입 시 구독, 이탈 시 해제
+  - 초기 로딩: REST `GET /api/v1/market/indices` 호출하여 즉시 표시
+  - 실시간 업데이트: STOMP 메시지 수신 시 카드/차트 업데이트
+  - `stock-store.ts`에 `indices: MarketIndicesItem[]` 상태 및 `updateIndices(data)` 액션 추가
+- [ ] **`/user/queue/trade` 구독 및 체결 알림 처리**
+  - 로그인 완료 시 전역 구독, 로그아웃 시 해제
+  - `ui-store` 또는 `user-store`에 알림 리스트 추가
+  - 토스트 메시지 표시: "AAPL 매수 체결 완료 (10주 @ $195.12)"
+  - `/trade` 페이지에 "실시간 체결 로그" 영역 추가 (최근 10개 표시)
 - [ ] Historical Data (캔들) API 에러 처리 구현
   - `429 QUOTA_EXCEEDED` 에러 시 사용자 안내 메시지 표시
   - `X-Data-Status: Stale` 또는 `warning` 필드 감지 시 UI에 "최신 데이터 아님" 표시
@@ -539,11 +586,11 @@ Zustand를 사용하여 전역 상태를 효율적으로 관리하고 컴포넌�
 - [ ] **데이터 완성도 표시**: 여러 Provider에서 병합된 데이터의 경우, 데이터 완성도(커버리지)를 시각적으로 표시
 - [ ] **Fallback 상태 안내**: Primary Provider 실패 시 Secondary Provider로 전환된 경우, 사용자에게 안내 메시지 표시
 
-**참고**: Phase 4는 백엔드의 Phase 9(외부 API 확장 전략) 구현 후에만 필요한 작업입니다.
+**참고**: Phase 4는 백엔드의 Phase 8(외부 API 확장 전략) 구현 후에만 필요한 작업입니다.
 
 ### 🔵 Phase 5: 관리자 기능 (향후 개선)
 
-백엔드의 Phase 10(Market Movers 관리 기능) 구현 시, 관리자 페이지에서 종목 리스트를 관리할 수 있습니다.
+백엔드의 Phase 9(Market Movers 관리 기능) 구현 시, 관리자 페이지에서 종목 리스트를 관리할 수 있습니다.
 
 - [ ] **관리자 페이지 (선택)**: Market Movers 종목 리스트 관리 UI
   - 종목 추가/수정/삭제 기능

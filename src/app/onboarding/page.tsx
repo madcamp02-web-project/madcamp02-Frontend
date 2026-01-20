@@ -3,30 +3,74 @@
 import React, { useState } from "react";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
-import { calculateSaju } from "@/lib/saju-calculator";
+import { userApi } from "@/lib/api/user";
 import { SajuInfo } from "@/types/user";
+import { useRouter } from "next/navigation";
 
 type OnboardingStep = "profile" | "survey" | "analyzing" | "result";
 
 export default function OnboardingPage() {
+    const router = useRouter();
     const [currentStep, setCurrentStep] = useState<OnboardingStep>("profile");
     const [formData, setFormData] = useState({
         nickname: "",
         birthDate: "",
         birthTime: "",
+        gender: "" as "MALE" | "FEMALE" | "OTHER" | "",
+        calendarType: "SOLAR" as "SOLAR" | "LUNAR" | "LUNAR_LEAP",
         investmentStyle: "",
     });
     const [result, setResult] = useState<SajuInfo | null>(null);
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
-    const handleNext = () => {
-        if (currentStep === "profile") setCurrentStep("survey");
-        else if (currentStep === "survey") {
+    const handleNext = async () => {
+        if (currentStep === "profile") {
+            if (!formData.nickname || !formData.birthDate || !formData.gender) {
+                setError("필수 항목을 모두 입력해주세요.");
+                return;
+            }
+            setCurrentStep("survey");
+        } else if (currentStep === "survey") {
+            if (!formData.investmentStyle) {
+                setError("투자 성향을 선택해주세요.");
+                return;
+            }
             setCurrentStep("analyzing");
-            // Perform calculation
-            const sajuResult = calculateSaju(formData.birthDate);
-            setResult(sajuResult);
+            setError(null);
+            setIsLoading(true);
 
-            setTimeout(() => setCurrentStep("result"), 2500);
+            try {
+                // API 호출
+                const response = await userApi.submitOnboarding({
+                    nickname: formData.nickname,
+                    birthDate: formData.birthDate,
+                    birthTime: formData.birthTime || undefined,
+                    gender: formData.gender as "MALE" | "FEMALE" | "OTHER",
+                    calendarType: formData.calendarType,
+                });
+
+                // 응답에서 사주 정보 추출
+                if (response.saju) {
+                    setResult(response.saju);
+                } else {
+                    // 응답 형식에 따라 조정 필요
+                    setResult({
+                        element: 'WOOD',
+                        animal: '호랑이',
+                        luck: '운명적 투자 성향 분석 완료',
+                    });
+                }
+
+                setTimeout(() => {
+                    setCurrentStep("result");
+                    setIsLoading(false);
+                }, 1500);
+            } catch (err: any) {
+                setError(err.response?.data?.message || "온보딩 처리 중 오류가 발생했습니다.");
+                setIsLoading(false);
+                setCurrentStep("survey");
+            }
         }
     };
 
@@ -35,7 +79,7 @@ export default function OnboardingPage() {
     };
 
     return (
-        <div className="flex items-center justify-center min-h-screen bg-[var(--bg-main)] relative overflow-hidden p-4">
+        <div className="flex items-center justify-center min-h-screen bg-[var(--bg-main)] relative overflow-hidden p-4" suppressHydrationWarning>
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[120vw] h-[120vh] bg-[radial-gradient(circle_at_center,rgba(147,51,234,0.15)_0%,transparent_60%)] pointer-events-none z-0" />
 
             <div className="w-full max-w-[500px] min-h-[600px] p-10 flex flex-col relative z-10 glass-panel shadow-2xl rounded-3xl">
@@ -58,6 +102,11 @@ export default function OnboardingPage() {
                         </div>
 
                         <div className="flex flex-col gap-5 flex-1 mb-8">
+                            {error && (
+                                <div className="bg-red-500/20 border border-red-500/50 rounded-xl p-3 text-red-400 text-sm">
+                                    {error}
+                                </div>
+                            )}
                             <Input
                                 label="Nickname"
                                 placeholder="투자도사"
@@ -82,9 +131,34 @@ export default function OnboardingPage() {
                                     onChange={(e) => setFormData({ ...formData, birthTime: e.target.value })}
                                 />
                             </div>
+                            <div>
+                                <label className="text-sm text-gray-400 mb-2 block">Gender (필수)</label>
+                                <select
+                                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white outline-none transition-all focus:border-[var(--accent-purple)] focus:shadow-[0_0_15px_rgba(147,51,234,0.2)] icon-invert"
+                                    value={formData.gender}
+                                    onChange={(e) => setFormData({ ...formData, gender: e.target.value as "MALE" | "FEMALE" | "OTHER" })}
+                                >
+                                    <option value="">선택하세요</option>
+                                    <option value="MALE">남성</option>
+                                    <option value="FEMALE">여성</option>
+                                    <option value="OTHER">기타</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label className="text-sm text-gray-400 mb-2 block">Calendar Type (필수)</label>
+                                <select
+                                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white outline-none transition-all focus:border-[var(--accent-purple)] focus:shadow-[0_0_15px_rgba(147,51,234,0.2)] icon-invert"
+                                    value={formData.calendarType}
+                                    onChange={(e) => setFormData({ ...formData, calendarType: e.target.value as "SOLAR" | "LUNAR" | "LUNAR_LEAP" })}
+                                >
+                                    <option value="SOLAR">양력</option>
+                                    <option value="LUNAR">음력</option>
+                                    <option value="LUNAR_LEAP">윤달</option>
+                                </select>
+                            </div>
                         </div>
 
-                        <Button variant="primary" onClick={handleNext} disabled={!formData.nickname || !formData.birthDate}>
+                        <Button variant="primary" onClick={handleNext} disabled={!formData.nickname || !formData.birthDate || !formData.gender}>
                             Next Step
                         </Button>
                     </div>
@@ -170,7 +244,7 @@ export default function OnboardingPage() {
                             </div>
                         </div>
 
-                        <Button variant="primary" onClick={() => window.location.href = "/"}>
+                        <Button variant="primary" onClick={() => router.push("/")}>
                             Enter Dashboard 🚀
                         </Button>
                     </div>

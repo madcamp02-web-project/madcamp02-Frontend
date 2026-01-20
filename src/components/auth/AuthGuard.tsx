@@ -33,8 +33,8 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
     if (!mounted || isLoading) {
         console.log("AUTH GUARD: Loading...");
         return (
-            <div className="h-full w-full flex items-center justify-center bg-background">
-                <div className="w-8 h-8 border-4 border-yellow-500 border-t-transparent rounded-full animate-spin"></div>
+            <div className="h-full w-full flex items-center justify-center bg-background" suppressHydrationWarning>
+                <div className="w-8 h-8 border-4 border-yellow-500 border-t-transparent rounded-full animate-spin" suppressHydrationWarning></div>
             </div>
         );
     }

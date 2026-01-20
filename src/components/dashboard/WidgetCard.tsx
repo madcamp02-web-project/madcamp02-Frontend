@@ -19,7 +19,7 @@ export default function WidgetCard({ title, action, children, footer, className 
                     {action && <div>{action}</div>}
                 </div>
             )}
-            <div className="flex-1 overflow-auto scrollbar-hide">
+            <div className="flex-1 overflow-auto min-h-0">
                 {children}
             </div>
             {footer && (

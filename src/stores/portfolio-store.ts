@@ -1,149 +1,103 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
-import { immer } from 'zustand/middleware/immer';
-
-
-export interface Holding {
-    ticker: string;
-    quantity: number;
-    avgPrice: number;
-}
-
-export interface Transaction {
-    id: string;
-    ticker: string;
-    type: 'buy' | 'sell';
-    price: number;
-    quantity: number;
-    timestamp: number; // Use timestamp for easier sorting
-}
+import { tradeApi } from '@/lib/api/trade';
+import { PortfolioResponse, PortfolioPosition, TradeHistoryItem, AvailableBalanceResponse, TradeOrderRequest } from '@/types/api';
 
 interface PortfolioState {
-    cash: number; // In USD
-    holdings: Record<string, Holding>; // key: ticker
-    transactions: Transaction[];
+    // Portfolio summary
+    summary: PortfolioResponse['summary'] | null;
+    // Positions (holdings)
+    positions: PortfolioPosition[];
+    // Trade history
+    transactions: TradeHistoryItem[];
+    // Available balance
+    availableBalance: number | null;
+    // Loading states
+    isLoading: boolean;
+    error: string | null;
 
     // Actions
-    buyStock: (ticker: string, price: number, quantity: number, type?: 'buy' | 'sell') => void; // price is in TICKER'S CURRENCY
-    sellStock: (ticker: string, price: number, quantity: number, type?: 'buy' | 'sell') => void;
-    resetPortfolio: () => void;
+    fetchPortfolio: () => Promise<void>;
+    fetchHistory: () => Promise<void>;
+    fetchAvailableBalance: () => Promise<void>;
+    placeOrder: (orderData: TradeOrderRequest) => Promise<void>;
 }
 
-const EXCHANGE_RATE = 1430; // 1 USD = 1430 KRW
+export const usePortfolioStore = create<PortfolioState>((set, get) => ({
+    summary: null,
+    positions: [],
+    transactions: [],
+    availableBalance: null,
+    isLoading: false,
+    error: null,
 
-export const usePortfolioStore = create<PortfolioState>()(
-    persist(
-        (set, get) => ({
-            cash: 10000, // Initial $10,000 USD
-            holdings: {},
-            transactions: [],
-
-            buyStock: (ticker, price, quantity) =>
-                set((state) => {
-                    const isKRW = ['005930', '000660', '035420', '005380', '051910'].includes(ticker);
-                    const costInLocal = price * quantity;
-                    const costInUSD = isKRW ? costInLocal / EXCHANGE_RATE : costInLocal;
-
-                    if (state.cash < costInUSD) {
-                        alert('not enough cash');
-                        return state;
-                    }
-
-                    const newCash = state.cash - costInUSD;
-                    // ... rest of logic needs to handle normalized avgPrice?
-                    // Actually, let's keep holdings avgPrice in LOCAL currency for tracking per-stock performance correctly.
-                    // We only convert CASH interactions.
-
-                    const existing = state.holdings[ticker];
-                    const newQuantity = (existing?.quantity || 0) + quantity;
-                    const totalCost = (existing?.avgPrice || 0) * (existing?.quantity || 0) + price * quantity;
-                    const newAvgPrice = totalCost / newQuantity;
-
-                    return {
-                        cash: newCash,
-                        holdings: {
-                            ...state.holdings,
-                            [ticker]: {
-                                ticker,
-                                quantity: newQuantity,
-                                avgPrice: newAvgPrice,
-                            },
-                        },
-                        transactions: [
-                            ...state.transactions,
-                            {
-                                id: Math.random().toString(36).substring(7),
-                                ticker,
-                                type: 'buy',
-                                price, // Record local price
-                                quantity,
-                                timestamp: Date.now(),
-                            },
-                        ],
-                    };
-                }),
-
-            sellStock: (ticker, price, quantity) =>
-                set((state) => {
-                    const existing = state.holdings[ticker];
-                    if (!existing || existing.quantity < quantity) {
-                        alert('not enough stock');
-                        return state;
-                    }
-
-                    const isKRW = ['005930', '000660', '035420', '005380', '051910'].includes(ticker);
-                    const revenueInLocal = price * quantity;
-                    const revenueInUSD = isKRW ? revenueInLocal / EXCHANGE_RATE : revenueInLocal;
-
-                    const newCash = state.cash + revenueInUSD;
-                    const newQuantity = existing.quantity - quantity;
-
-                    if (newQuantity === 0) {
-                        const { [ticker]: _, ...rest } = state.holdings;
-                        return {
-                            cash: newCash,
-                            holdings: rest,
-                            transactions: [
-                                ...state.transactions,
-                                {
-                                    id: Math.random().toString(36).substring(7),
-                                    ticker,
-                                    type: 'sell',
-                                    price,
-                                    quantity,
-                                    timestamp: Date.now(),
-                                },
-                            ]
-                        };
-                    }
-
-                    return {
-                        cash: newCash,
-                        holdings: {
-                            ...state.holdings,
-                            [ticker]: {
-                                ...existing,
-                                quantity: newQuantity,
-                            },
-                        },
-                        transactions: [
-                            ...state.transactions,
-                            {
-                                id: Math.random().toString(36).substring(7),
-                                ticker,
-                                type: 'sell',
-                                price,
-                                quantity,
-                                timestamp: Date.now(),
-                            },
-                        ]
-                    };
-                }),
-
-            resetPortfolio: () => set({ cash: 10000, holdings: {}, transactions: [] }),
-        }),
-        {
-            name: 'portfolio-storage',
+    fetchPortfolio: async () => {
+        set({ isLoading: true, error: null });
+        try {
+            const response = await tradeApi.getPortfolio();
+            set({ 
+                summary: response.summary,
+                positions: response.positions,
+                isLoading: false 
+            });
+        } catch (error: any) {
+            set({ 
+                error: error.response?.data?.message || 'Failed to fetch portfolio',
+                isLoading: false 
+            });
+            throw error;
         }
-    )
-);
+    },
+
+    fetchHistory: async () => {
+        set({ isLoading: true, error: null });
+        try {
+            const response = await tradeApi.getHistory();
+            set({ 
+                transactions: response.items,
+                isLoading: false 
+            });
+        } catch (error: any) {
+            set({ 
+                error: error.response?.data?.message || 'Failed to fetch trade history',
+                isLoading: false 
+            });
+            throw error;
+        }
+    },
+
+    fetchAvailableBalance: async () => {
+        set({ isLoading: true, error: null });
+        try {
+            const response = await tradeApi.getAvailableBalance();
+            set({ 
+                availableBalance: response.availableBalance,
+                isLoading: false 
+            });
+        } catch (error: any) {
+            set({ 
+                error: error.response?.data?.message || 'Failed to fetch available balance',
+                isLoading: false 
+            });
+            throw error;
+        }
+    },
+
+    placeOrder: async (orderData: TradeOrderRequest) => {
+        set({ isLoading: true, error: null });
+        try {
+            await tradeApi.placeOrder(orderData);
+            // 주문 성공 후 포트폴리오와 잔고 재조회
+            await Promise.all([
+                get().fetchPortfolio(),
+                get().fetchAvailableBalance(),
+                get().fetchHistory(),
+            ]);
+        } catch (error: any) {
+            set({ 
+                error: error.response?.data?.message || 'Failed to place order',
+                isLoading: false 
+            });
+            throw error;
+        }
+    },
+}));

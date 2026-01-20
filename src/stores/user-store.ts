@@ -1,102 +1,128 @@
 import { create } from 'zustand';
-
-export interface Item {
-    id: number;
-    name: string;
-    type: 'avatar' | 'nameplate' | 'theme';
-    image: string;
-    isEquipped: boolean;
-    rarity: 'common' | 'rare' | 'epic' | 'legendary';
-}
-
-interface UserProfile {
-    nickname: string;
-    email: string;
-    birthDate: string;
-    birthTime: string;
-    avatar: string; // Base avatar image path
-}
-
-interface UserStats {
-    rank: number;
-    profit: string;
-    coins: number;
-}
+import { User, Wallet } from '@/types/user';
+import { InventoryItem } from '@/types/api';
+import { userApi } from '@/lib/api/user';
+import { gameApi } from '@/lib/api/game';
 
 interface UserState {
-    profile: UserProfile;
-    items: Item[];
-    stats: UserStats;
+    // Profile data (from User API)
+    profile: User | null;
+    // Inventory items (from Game API)
+    items: InventoryItem[];
+    // Wallet stats (from Wallet API)
+    wallet: Wallet | null;
+    // Settings
     isPublic: boolean;
     isRankingJoined: boolean;
+    // Loading states
+    isLoading: boolean;
+    error: string | null;
 
     // Actions
-    toggleEquip: (itemId: number) => void;
-    updateProfile: (fields: Partial<UserProfile>) => void;
-    setPublicProfile: (isPublic: boolean) => void;
-    setRankingJoined: (isJoined: boolean) => void;
-    buyItem: (item: Omit<Item, 'id' | 'isEquipped'>, price: number) => boolean; // Returns true if success
+    fetchProfile: () => Promise<void>;
+    fetchInventory: () => Promise<void>;
+    fetchWallet: () => Promise<void>;
+    updateProfile: (fields: Partial<User>) => Promise<void>;
+    toggleEquip: (itemId: number) => Promise<void>;
+    setPublicProfile: (isPublic: boolean) => Promise<void>;
+    setRankingJoined: (isJoined: boolean) => Promise<void>;
 }
 
-// Initial Mock Data
-const initialProfile: UserProfile = {
-    nickname: "투자도사",
-    email: "investor@example.com",
-    birthDate: "1995-05-20",
-    birthTime: "14:30",
-    avatar: "/images/oracle_sage.png",
-};
-
-const initialStats: UserStats = {
-    rank: 125, // Mock rank
-    profit: "+32.10%",
-    coins: 2500,
-};
-
-const initialItems: Item[] = [
-    { id: 1, name: "황금 왕관", type: "avatar", image: "👑", isEquipped: true, rarity: "legendary" },
-    { id: 2, name: "다이아 망토", type: "avatar", image: "💎", isEquipped: true, rarity: "epic" },
-    { id: 3, name: "반짝이 테두리", type: "nameplate", image: "✨", isEquipped: false, rarity: "common" },
-    { id: 4, name: "골드 럭셔리 테마", type: "theme", image: "🌟", isEquipped: false, rarity: "rare" },
-    { id: 5, name: "멋진 선글라스", type: "avatar", image: "😎", isEquipped: false, rarity: "common" },
-];
-
 export const useUserStore = create<UserState>((set, get) => ({
-    profile: initialProfile,
-    items: initialItems,
-    stats: initialStats,
+    profile: null,
+    items: [],
+    wallet: null,
     isPublic: true,
     isRankingJoined: true,
+    isLoading: false,
+    error: null,
 
-    toggleEquip: (itemId) => set((state) => ({
-        items: state.items.map((item) =>
-            item.id === itemId
-                ? { ...item, isEquipped: !item.isEquipped }
-                : item
-        ),
-    })),
+    fetchProfile: async () => {
+        set({ isLoading: true, error: null });
+        try {
+            const profile = await userApi.getProfile();
+            set({ 
+                profile, 
+                isPublic: profile.isPublic ?? true,
+                isRankingJoined: profile.isRankingJoined ?? true,
+                isLoading: false 
+            });
+        } catch (error: any) {
+            set({ 
+                error: error.response?.data?.message || 'Failed to fetch profile',
+                isLoading: false 
+            });
+            throw error;
+        }
+    },
 
-    updateProfile: (fields) => set((state) => ({
-        profile: { ...state.profile, ...fields }
-    })),
+    fetchInventory: async () => {
+        set({ isLoading: true, error: null });
+        try {
+            const response = await gameApi.getInventory();
+            set({ items: response.items, isLoading: false });
+        } catch (error: any) {
+            set({ 
+                error: error.response?.data?.message || 'Failed to fetch inventory',
+                isLoading: false 
+            });
+            throw error;
+        }
+    },
 
-    setPublicProfile: (isPublic) => set({ isPublic }),
-    setRankingJoined: (isRankingJoined) => set({ isRankingJoined }),
+    fetchWallet: async () => {
+        set({ isLoading: true, error: null });
+        try {
+            const wallet = await userApi.getWallet();
+            set({ wallet, isLoading: false });
+        } catch (error: any) {
+            set({ 
+                error: error.response?.data?.message || 'Failed to fetch wallet',
+                isLoading: false 
+            });
+            throw error;
+        }
+    },
 
-    buyItem: (itemData, price) => {
-        const { stats, items } = get();
-        if (stats.coins < price) return false;
+    updateProfile: async (fields: Partial<User>) => {
+        set({ isLoading: true, error: null });
+        try {
+            const updatedProfile = await userApi.updateProfile(fields);
+            set({ 
+                profile: updatedProfile,
+                isPublic: updatedProfile.isPublic ?? get().isPublic,
+                isRankingJoined: updatedProfile.isRankingJoined ?? get().isRankingJoined,
+                isLoading: false 
+            });
+        } catch (error: any) {
+            set({ 
+                error: error.response?.data?.message || 'Failed to update profile',
+                isLoading: false 
+            });
+            throw error;
+        }
+    },
 
-        const newItem: Item = {
-            ...itemData,
-            id: Math.max(0, ...items.map(i => i.id)) + 1,
-            isEquipped: false
-        };
+    toggleEquip: async (itemId: number) => {
+        set({ isLoading: true, error: null });
+        try {
+            await gameApi.equipItem(itemId);
+            // Refresh inventory after equip
+            await get().fetchInventory();
+        } catch (error: any) {
+            set({ 
+                error: error.response?.data?.message || 'Failed to equip item',
+                isLoading: false 
+            });
+            throw error;
+        }
+    },
 
-        set((state) => ({
-            stats: { ...state.stats, coins: state.stats.coins - price },
-            items: [...state.items, newItem]
-        }));
-        return true;
-    }
+    setPublicProfile: async (isPublic: boolean) => {
+        await get().updateProfile({ isPublic });
+    },
+
+    setRankingJoined: async (isJoined: boolean) => {
+        await get().updateProfile({ isRankingJoined: isJoined });
+    },
 }));
