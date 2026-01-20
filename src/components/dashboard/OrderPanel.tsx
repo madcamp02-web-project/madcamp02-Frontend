@@ -15,12 +15,12 @@ export default function OrderPanel({ ticker: tickerProp }: OrderPanelProps) {
     const [tab, setTab] = useState<'buy' | 'sell'>('buy');
     const [orderType, setOrderType] = useState<'market' | 'limit'>('market');
     const [limitPrice, setLimitPrice] = useState<number>(0);
-    const [qty, setQty] = useState<number>(0);
+    const [qty, setQty] = useState<string>('');
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    const { 
-        availableBalance, 
-        positions, 
+    const {
+        availableBalance,
+        positions,
         placeOrder,
         fetchAvailableBalance,
     } = usePortfolioStore();
@@ -33,8 +33,8 @@ export default function OrderPanel({ ticker: tickerProp }: OrderPanelProps) {
     // 초기 로드
     useEffect(() => {
         if (ticker) {
-            fetchStockQuote(ticker).catch(() => {});
-            fetchAvailableBalance().catch(() => {});
+            fetchStockQuote(ticker).catch(() => { });
+            fetchAvailableBalance().catch(() => { });
         }
     }, [ticker, fetchStockQuote, fetchAvailableBalance]);
 
@@ -61,7 +61,7 @@ export default function OrderPanel({ ticker: tickerProp }: OrderPanelProps) {
 
     const handleOrder = async () => {
         const price = orderType === 'market' ? currentPrice : limitPrice;
-        if (qty <= 0) {
+        if (!qty || Number(qty) <= 0) {
             alert('수량을 입력해주세요.');
             return;
         }
@@ -83,11 +83,11 @@ export default function OrderPanel({ ticker: tickerProp }: OrderPanelProps) {
             await placeOrder({
                 ticker,
                 type: tab === 'buy' ? 'BUY' : 'SELL',
-                quantity: qty,
+                quantity: Number(qty),
             });
             // 주문 성공 후 수량 초기화 및 현재가 다시 불러오기
-            setQty(0);
-            await fetchStockQuote(ticker).catch(() => {});
+            setQty('');
+            await fetchStockQuote(ticker).catch(() => { });
         } catch (error: any) {
             const errorCode = error.response?.data?.error;
             if (errorCode === 'TRADE_001') {
@@ -106,7 +106,7 @@ export default function OrderPanel({ ticker: tickerProp }: OrderPanelProps) {
     // Calculations
     const totalAmount = useMemo(() => {
         const price = orderType === 'market' ? (currentPrice || 0) : (limitPrice || 0);
-        return price * (qty || 0);
+        return price * (Number(qty) || 0);
     }, [orderType, currentPrice, limitPrice, qty]);
     const isBuy = tab === 'buy';
 
@@ -178,8 +178,9 @@ export default function OrderPanel({ ticker: tickerProp }: OrderPanelProps) {
                             <input
                                 type="number"
                                 value={qty}
-                                onChange={(e) => setQty(Number(e.target.value))}
+                                onChange={(e) => setQty(e.target.value)}
                                 placeholder="0"
+                                min="0"
                                 className="w-full bg-secondary border border-border rounded-xl pl-4 pr-1 py-2 text-base font-bold outline-none focus:border-accent transition-all"
                             />
                             <span className="absolute right-7 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">주</span>

@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useUIStore } from "@/stores/ui-store";
 import { handleSignOut } from "@/lib/actions";
@@ -40,12 +41,15 @@ export default function Sidebar() {
   return (
     <aside className={`${isSidebarOpen ? 'w-[280px] p-6 border-r' : 'w-0 p-0 border-none min-w-0'} h-screen bg-card border-border flex flex-col shrink-0 transition-all duration-300 ease-out overflow-y-auto whitespace-nowrap`} suppressHydrationWarning>
       {/* 상단 고정 영역: 로고 */}
-      <div className="flex items-center gap-3 mb-8 min-w-[200px] shrink-0">
-        <div className="text-2xl text-accent">☀️</div>
-        <div className="flex flex-col">
-          <span className="font-heading font-bold text-base text-foreground">Stock-Persona</span>
-          <span className="text-xs text-muted-foreground">투자 RPG 대시보드</span>
-        </div>
+      <div className="flex flex-col items-center gap-3 mb-8 min-w-[200px] shrink-0">
+        <Image
+          src="/jusulsa-circle-logo.png"
+          alt="주술사"
+          width={500}
+          height={500}
+          className="object-contain rounded-full"
+        />
+        <span className="text-xs text-muted-foreground">주식이 술술 풀리는 사람들</span>
       </div>
 
       {/* 상단 고정 영역: 테마 토글 */}
@@ -89,15 +93,8 @@ export default function Sidebar() {
         })}
       </nav>
 
-      {/* 하단 고정 영역: 프로필 및 로그아웃 */}
+      {/* 하단 고정 영역: 로그아웃 */}
       <div className="mt-auto pt-6 border-t border-border min-w-[200px] shrink-0">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-9 h-9 bg-accent rounded-full flex items-center justify-center text-lg">👑</div>
-          <div className="flex flex-col">
-            <div className="font-semibold text-foreground text-sm">황금손</div>
-            <div className="text-xs text-muted-foreground">총 자산 2,600 💎</div>
-          </div>
-        </div>
         <form action={handleSignOut}>
           <button
             type="submit"

@@ -10,7 +10,7 @@ function getTimeAgo(dateString: string): string {
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
     const diffMins = Math.floor(diffMs / 60000);
-    
+
     if (diffMins < 1) return '방금 전';
     if (diffMins < 60) return `${diffMins}분 전`;
     const diffHours = Math.floor(diffMins / 60);
@@ -32,16 +32,16 @@ function formatVolume(volume: number): string {
 
 export default function MarketNewsPage() {
     const [newsTab, setNewsTab] = useState<'all' | 'stock' | 'economy'>('all');
-    const { 
-        indices, 
-        movers, 
-        news, 
-        isLoading, 
+    const {
+        indices,
+        movers,
+        news,
+        isLoading,
         error,
         isUsingCache,
         backendCache,
-        fetchIndices, 
-        fetchMovers, 
+        fetchIndices,
+        fetchMovers,
         fetchNews,
         updateIndices,
     } = useStockStore();
@@ -106,12 +106,12 @@ export default function MarketNewsPage() {
         .filter(item => item.direction === 'UP')
         .slice(0, 5)
         .map((item, idx) => ({ ...item, rank: idx + 1 })) || [];
-    
+
     const fallingStocks = movers?.items
         .filter(item => item.direction === 'DOWN')
         .slice(0, 5)
         .map((item, idx) => ({ ...item, rank: idx + 1 })) || [];
-    
+
     const topVolumeStocks = movers?.items
         ? [...movers.items].sort((a, b) => (b.volume || 0) - (a.volume || 0))
             .slice(0, 5)
@@ -163,38 +163,38 @@ export default function MarketNewsPage() {
             {/* Scrollable Content */}
             <div className="flex-1 overflow-auto p-4">
                 {/* 백엔드 Redis 캐시 상태 알림 (Phase 3.6) */}
-                {(backendCache.indices?.status === 'STALE' || 
-                  backendCache.movers?.status === 'STALE' || 
-                  backendCache.news?.status === 'STALE') && (
-                    <div className="mb-4 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-                        <div className="text-blue-400 text-sm font-medium mb-1">
-                            캐시된 데이터를 표시 중입니다
+                {(backendCache.indices?.status === 'STALE' ||
+                    backendCache.movers?.status === 'STALE' ||
+                    backendCache.news?.status === 'STALE') && (
+                        <div className="mb-4 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                            <div className="text-blue-400 text-sm font-medium mb-1">
+                                캐시된 데이터를 표시 중입니다
+                            </div>
+                            <div className="text-muted-foreground text-xs mb-2">
+                                최신 데이터를 불러오는 중입니다. 잠시 후 자동으로 갱신됩니다.
+                            </div>
                         </div>
-                        <div className="text-muted-foreground text-xs mb-2">
-                            최신 데이터를 불러오는 중입니다. 잠시 후 자동으로 갱신됩니다.
-                        </div>
-                    </div>
-                )}
+                    )}
 
                 {/* 프론트엔드 localStorage 캐시 사용 알림 (백엔드 응답 없을 때만) */}
-                {(isUsingCache.indices || isUsingCache.movers || isUsingCache.news) && 
-                 !backendCache.indices && !backendCache.movers && !backendCache.news && (
-                    <div className="mb-4 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
-                        <div className="text-yellow-400 text-sm font-medium mb-1">
-                            로컬 캐시 데이터를 표시 중입니다
+                {(isUsingCache.indices || isUsingCache.movers || isUsingCache.news) &&
+                    !backendCache.indices && !backendCache.movers && !backendCache.news && (
+                        <div className="mb-4 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
+                            <div className="text-yellow-400 text-sm font-medium mb-1">
+                                로컬 캐시 데이터를 표시 중입니다
+                            </div>
+                            <div className="text-muted-foreground text-xs mb-2">
+                                서버 연결을 확인하는 중입니다.
+                            </div>
                         </div>
-                        <div className="text-muted-foreground text-xs mb-2">
-                            서버 연결을 확인하는 중입니다.
-                        </div>
-                    </div>
-                )}
+                    )}
 
                 {/* 에러 알림 (캐시도 없고 API도 실패한 경우) */}
                 {error && !isUsingCache.indices && !isUsingCache.movers && !isUsingCache.news && (
                     <div className="mb-4 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
                         <div className="text-yellow-400 text-sm font-medium mb-1">일부 데이터를 불러오지 못했습니다</div>
                         <div className="text-muted-foreground text-xs mb-2">{error}</div>
-                        <button 
+                        <button
                             onClick={async () => {
                                 // 에러 상태 초기화 후 재시도
                                 await Promise.all([
@@ -221,14 +221,14 @@ export default function MarketNewsPage() {
                             <div key={index.code} className="bg-card border border-border rounded-2xl p-4">
                                 <div className="flex justify-between items-start mb-2">
                                     <span className="text-muted-foreground text-sm">{index.name}</span>
-                                    <span className={`text-xs ${isPositive ? 'text-green-400' : 'text-red-400'}`}>
+                                    <span className={`text-xs ${isPositive ? 'text-red-400' : 'text-blue-400'}`}>
                                         {isPositive ? '↗' : '↘'} {isPositive ? '+' : ''}{changePercent.toFixed(2)}%
                                     </span>
                                 </div>
                                 <div className="text-2xl font-bold text-foreground mb-1">
                                     {value.toLocaleString(undefined, { maximumFractionDigits: 2 })}
                                 </div>
-                                <div className={`text-sm ${isPositive ? 'text-green-400' : 'text-red-400'}`}>
+                                <div className={`text-sm ${isPositive ? 'text-red-400' : 'text-blue-400'}`}>
                                     {isPositive ? '+' : ''}{change.toFixed(2)}
                                 </div>
                             </div>
@@ -245,40 +245,11 @@ export default function MarketNewsPage() {
                     {/* Rising Stocks */}
                     <div className="bg-card border border-border rounded-2xl p-4">
                         <div className="flex items-center gap-2 mb-4">
-                            <span className="text-green-400">🔥</span>
+                            <span className="text-red-400">🔥</span>
                             <h2 className="text-foreground font-bold">급등 종목</h2>
                         </div>
                         <div className="space-y-2">
                             {risingStocks.length > 0 ? risingStocks.map((stock) => (
-                                <div key={stock.ticker} className="flex items-center justify-between py-2 border-b border-border">
-                                    <div className="flex items-center gap-3">
-                                        <span className="w-6 h-6 bg-green-500/20 rounded-full flex items-center justify-center text-green-400 text-xs font-bold">
-                                            {stock.rank}
-                                        </span>
-                                        <div>
-                                            <div className="text-foreground font-medium text-sm">{stock.name}</div>
-                                            <div className="text-muted-foreground text-xs">{stock.ticker}</div>
-                                        </div>
-                                    </div>
-                                    <div className="text-right">
-                                        <div className="text-foreground font-medium text-sm">{stock.price.toLocaleString()}</div>
-                                        <div className="text-green-500 text-xs font-medium">+{stock.changePercent.toFixed(2)}%</div>
-                                    </div>
-                                </div>
-                            )) : (
-                                <div className="text-muted-foreground text-sm py-4 text-center">데이터가 없습니다</div>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Falling Stocks */}
-                    <div className="bg-card border border-border rounded-2xl p-4">
-                        <div className="flex items-center gap-2 mb-4">
-                            <span className="text-red-400">📉</span>
-                            <h2 className="text-foreground font-bold">급락 종목</h2>
-                        </div>
-                        <div className="space-y-2">
-                            {fallingStocks.length > 0 ? fallingStocks.map((stock) => (
                                 <div key={stock.ticker} className="flex items-center justify-between py-2 border-b border-border">
                                     <div className="flex items-center gap-3">
                                         <span className="w-6 h-6 bg-red-500/20 rounded-full flex items-center justify-center text-red-400 text-xs font-bold">
@@ -291,7 +262,36 @@ export default function MarketNewsPage() {
                                     </div>
                                     <div className="text-right">
                                         <div className="text-foreground font-medium text-sm">{stock.price.toLocaleString()}</div>
-                                        <div className="text-red-500 text-xs font-medium">{stock.changePercent.toFixed(2)}%</div>
+                                        <div className="text-red-500 text-xs font-medium">+{stock.changePercent.toFixed(2)}%</div>
+                                    </div>
+                                </div>
+                            )) : (
+                                <div className="text-muted-foreground text-sm py-4 text-center">데이터가 없습니다</div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Falling Stocks */}
+                    <div className="bg-card border border-border rounded-2xl p-4">
+                        <div className="flex items-center gap-2 mb-4">
+                            <span className="text-blue-400">📉</span>
+                            <h2 className="text-foreground font-bold">급락 종목</h2>
+                        </div>
+                        <div className="space-y-2">
+                            {fallingStocks.length > 0 ? fallingStocks.map((stock) => (
+                                <div key={stock.ticker} className="flex items-center justify-between py-2 border-b border-border">
+                                    <div className="flex items-center gap-3">
+                                        <span className="w-6 h-6 bg-blue-500/20 rounded-full flex items-center justify-center text-blue-400 text-xs font-bold">
+                                            {stock.rank}
+                                        </span>
+                                        <div>
+                                            <div className="text-foreground font-medium text-sm">{stock.name}</div>
+                                            <div className="text-muted-foreground text-xs">{stock.ticker}</div>
+                                        </div>
+                                    </div>
+                                    <div className="text-right">
+                                        <div className="text-foreground font-medium text-sm">{stock.price.toLocaleString()}</div>
+                                        <div className="text-blue-500 text-xs font-medium">{stock.changePercent.toFixed(2)}%</div>
                                     </div>
                                 </div>
                             )) : (
@@ -322,7 +322,7 @@ export default function MarketNewsPage() {
                                         </div>
                                         <div className="text-right">
                                             <div className="text-foreground font-medium text-sm">{stock.price.toLocaleString()}</div>
-                                            <div className={`text-xs font-medium ${isPositive ? 'text-green-500' : 'text-red-500'}`}>
+                                            <div className={`text-xs font-medium ${isPositive ? 'text-red-500' : 'text-blue-500'}`}>
                                                 {isPositive ? '+' : ''}{stock.changePercent.toFixed(2)}%
                                             </div>
                                         </div>
@@ -349,8 +349,8 @@ export default function MarketNewsPage() {
 
                     <div className="grid grid-cols-2 gap-4">
                         {news?.items && news.items.length > 0 && filteredNews.length > 0 ? filteredNews.map((newsItem) => (
-                            <div 
-                                key={newsItem.id} 
+                            <div
+                                key={newsItem.id}
                                 className="bg-secondary border border-border rounded-xl p-4 hover:border-muted-foreground/30 transition-all cursor-pointer"
                                 onClick={() => newsItem.url && window.open(newsItem.url, '_blank')}
                             >

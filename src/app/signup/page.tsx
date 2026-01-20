@@ -56,8 +56,8 @@ export default function SignupPage() {
 
     return (
         <div className="min-h-screen bg-[#0F0F12] text-white flex flex-col items-center justify-center p-4" suppressHydrationWarning>
-            <div className="w-full max-w-md bg-[#16161d] p-8 rounded-2xl border border-white/10 shadow-xl">
-                <h1 className="text-3xl font-bold text-center mb-6 bg-gradient-to-r from-[var(--accent-gold)] to-orange-500 bg-clip-text text-transparent">
+            <div className="w-full max-w-md bg-[#16161d] pt-3 pb-6 px-8 rounded-2xl border border-white/10 shadow-xl">
+                <h1 className="text-xl font-medium text-center mt-3 mb-6 text-[var(--accent-gold)]">
                     회원가입
                 </h1>
 
@@ -87,14 +87,14 @@ export default function SignupPage() {
                         <label className="block text-sm text-gray-400 mb-1">비밀번호</label>
                         <input
                             type="password"
-                            className="w-full bg-[#1E1E24] border border-white/10 rounded-xl px-4 py-3 focus:border-[var(--accent-gold)] outline-none transition-colors"
+                            className="w-full bg-[#1E1E24] border border-white/10 rounded-xl px-4 py-3 leading-6 focus:border-[var(--accent-gold)] outline-none transition-colors"
                             placeholder="********"
                             value={formData.password}
                             onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                         />
                     </div>
                     <div>
-                        <label className="block text-sm text-gray-400 mb-1">닉네임</label>
+                        <label className="block text-sm text-gray-400 mb-1">이름</label>
                         <input
                             type="text"
                             className="w-full bg-[#1E1E24] border border-white/10 rounded-xl px-4 py-3 focus:border-[var(--accent-gold)] outline-none transition-colors"
@@ -107,11 +107,11 @@ export default function SignupPage() {
                     <button
                         type="submit"
                         disabled={isLoading || isSuccess}
-                        className="w-full py-3 mt-4 bg-[var(--accent-gold)] text-white font-bold rounded-xl hover:brightness-110 transition-all shadow-lg shadow-yellow-500/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                        className="relative w-full h-12 mt-4 rounded-xl bg-[linear-gradient(135deg,rgba(255,215,0,0.25),rgba(255,215,0,0.05))] backdrop-blur-md border border-[rgba(255,215,0,0.35)] text-[#B8860B] font-semibold tracking-wide shadow-[0_0_25px_rgba(255,215,0,0.2)] transition-all duration-300 hover:shadow-[0_0_40px_rgba(255,215,0,0.4)] hover:border-[#B8860B] hover:text-[#B8860B] hover:brightness-110 active:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                     >
                         {isLoading ? (
                             <>
-                                <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                                <span className="w-4 h-4 border-2 border-[#B8860B]/30 border-t-[#B8860B] rounded-full animate-spin"></span>
                                 가입 처리중...
                             </>
                         ) : (
@@ -122,7 +122,7 @@ export default function SignupPage() {
 
                 <div className="mt-6 text-center text-sm text-gray-500">
                     이미 계정이 있으신가요?{" "}
-                    <Link href="/login" className="text-[var(--accent-gold)] hover:underline">
+                    <Link href="/login" className="text-amber-400 font-semibold hover:text-amber-300 hover:underline transition-colors ml-2">
                         로그인
                     </Link>
                 </div>

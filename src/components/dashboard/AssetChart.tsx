@@ -12,7 +12,7 @@ import { socketClient } from '@/lib/api/socket-client';
 // 백엔드에서 정확한 날짜 범위의 데이터를 제공하므로 샘플링 없이 그대로 변환
 function convertCandlesToChartData(candles: CandleItem[]): CandlestickData<Time>[] {
     if (!candles || candles.length === 0) return [];
-    
+
     // 시간순으로 정렬 후 Lightweight Charts 형식으로 변환
     return candles.map(candle => {
         const time = candle.timestamp as Time;
@@ -36,12 +36,12 @@ export default function AssetChart() {
     const seriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
     // 실시간 캔들을 시간별로 캐싱하기 위한 Map (time -> candle)
     const realtimeCandlesRef = useRef<Map<number, CandlestickData<Time>>>(new Map());
-    const { 
-        prices, 
-        currentQuote, 
-        candles, 
+    const {
+        prices,
+        currentQuote,
+        candles,
         searchResults,
-        fetchCandles, 
+        fetchCandles,
         fetchQuote,
         searchStocks,
         isLoading,
@@ -51,7 +51,7 @@ export default function AssetChart() {
         addRealtimeTrade,
         realtimeTrades,
     } = useStockStore();
-    
+
     const [selectedTicker, setSelectedTicker] = useState<string>('AAPL');
     const [timeframe, setTimeframe] = useState<string>('d'); // 기본값: d (일봉)
     const [timeframeError, setTimeframeError] = useState<string | null>(null); // timeframe 에러 추적
@@ -87,7 +87,7 @@ export default function AssetChart() {
             });
         }
     }, [selectedTicker, searchResults, searchStocks]);
-    
+
     // 가격 정보는 WebSocket으로 수신하므로 초기 API 호출 최소화
     // 백엔드 StockQuoteBroadcastService가 5초마다 활성 구독 종목의 Quote 데이터 브로드캐스트
 
@@ -100,18 +100,18 @@ export default function AssetChart() {
             console.log('[AssetChart] 차트 데이터 로드 시작:', { selectedTicker, timeframe, fetchTimeframe });
             setLastFetchedTicker(selectedTicker);
             setLastFetchedTimeframe(timeframe);
-            
+
             // 차트 데이터는 API로 가져오기 ('all'일 때는 'd' 데이터 사용)
             fetchCandles(selectedTicker, fetchTimeframe)
                 .then((response) => {
-                    console.log('[AssetChart] fetchCandles 완료:', { 
-                        selectedTicker, 
+                    console.log('[AssetChart] fetchCandles 완료:', {
+                        selectedTicker,
                         timeframe,
                         itemsCount: response?.items?.length || 0,
                         hasWarning: !!response?.warning,
                         warning: response?.warning,
                     });
-                    
+
                     // 경고 메시지는 표시하지 않음 - WebSocket으로 실시간 데이터 수신
                     setTimeframeError(null);
                 })
@@ -120,7 +120,7 @@ export default function AssetChart() {
                     console.error('[AssetChart] Failed to fetch candles (WebSocket으로 대체):', err);
                     setTimeframeError(null);
                 });
-            
+
             // 가격 정보는 WebSocket으로 수신하므로 초기 API 호출은 선택적
             // WebSocket 구독이 이미 설정되어 있으면 백엔드가 자동으로 Quote 데이터 브로드캐스트
             // 초기 표시를 위해 한 번만 호출 (캐시된 데이터가 있으면 사용)
@@ -153,14 +153,14 @@ export default function AssetChart() {
         if (candles?.items && candles.items.length > 0) {
             // ticker와 resolution이 일치하는지 확인 (선택적, 백엔드가 보장할 수도 있음)
             const isMatchingData = !candles.ticker || candles.ticker === selectedTicker;
-            
+
             if (!isMatchingData) {
                 console.warn('[AssetChart] 다른 종목의 데이터입니다:', {
                     expected: selectedTicker,
                     received: candles.ticker,
                 });
             }
-            
+
             console.log('[AssetChart] 차트 데이터 변환 시작, items 개수:', candles.items.length, 'timeframe:', timeframe);
             const convertedData = convertCandlesToChartData(candles.items);
             console.log('[AssetChart] 변환된 차트 데이터:', {
@@ -170,29 +170,29 @@ export default function AssetChart() {
                 first: convertedData[0],
                 last: convertedData[convertedData.length - 1],
             });
-            
+
             if (convertedData.length === 0) {
                 console.warn('[AssetChart] 변환된 데이터가 비어있습니다. 원본 items:', candles.items.slice(0, 3));
             }
-            
+
             setChartData(convertedData);
-            
+
             // 마지막 캔들 저장 (실시간 업데이트용)
             if (convertedData.length > 0) {
                 lastCandleRef.current = convertedData[convertedData.length - 1];
             }
-            
+
             // 차트가 이미 초기화되어 있으면 즉시 데이터 업데이트
             if (seriesRef.current && convertedData.length > 0 && chartRef.current) {
                 try {
                     seriesRef.current.setData(convertedData);
-                    
+
                     // 최신 데이터 중심으로 보이도록 설정
                     const firstTime = convertedData[0].time;
                     const lastTime = convertedData[convertedData.length - 1].time;
                     const firstTimeValue = typeof firstTime === 'number' ? firstTime : new Date(firstTime as string).getTime() / 1000;
                     const lastTimeValue = typeof lastTime === 'number' ? lastTime : new Date(lastTime as string).getTime() / 1000;
-                    
+
                     // timeframe에 따라 보이는 범위 결정
                     // 'all' 선택 시 전체 데이터 표시, 그 외에는 최신 데이터 중심으로 표시
                     if (timeframe === 'all') {
@@ -203,27 +203,27 @@ export default function AssetChart() {
                         const getVisibleRange = (tf: string, firstTimestamp: number, lastTimestamp: number): { from: number; to: number } => {
                             const now = Math.floor(Date.now() / 1000);
                             let visibleDays = 30; // 기본값: 30일
-                            
+
                             switch (tf) {
                                 case 'd': visibleDays = 30; break; // 일봉: 최근 30일
                                 case 'w': visibleDays = 84; break; // 주봉: 최근 12주 (84일)
                                 case 'm': visibleDays = 365; break; // 월봉: 최근 12개월 (365일)
                             }
-                            
+
                             // 최신 데이터 중심으로, 데이터가 있는 범위 내에서만
                             const to = Math.min(lastTimestamp, now);
                             const from = Math.max(lastTimestamp - (visibleDays * 86400), firstTimestamp);
-                            
+
                             return { from, to };
                         };
-                        
+
                         const visibleRange = getVisibleRange(timeframe, firstTimeValue, lastTimeValue);
                         chartRef.current.timeScale().setVisibleRange({
                             from: visibleRange.from as Time,
                             to: visibleRange.to as Time,
                         });
                     }
-                    
+
                     console.log('[AssetChart] 차트에 데이터 설정 완료:', convertedData.length);
                 } catch (err) {
                     console.error('[AssetChart] 차트 데이터 설정 실패:', err);
@@ -265,18 +265,18 @@ export default function AssetChart() {
                 try {
                     const data = JSON.parse(message.body);
                     console.log('[AssetChart] WebSocket 실시간 데이터 수신:', data);
-                    
+
                     // WebSocket 메시지 구조: { ticker, price, ts, volume, source, rawType, conditions }
                     const ticker = data.ticker || selectedTicker;
                     const price = data.price;
                     const volume = data.volume || 0;
                     const timestamp = data.ts || Date.now();
-                    
+
                     // 실시간 trade 데이터가 있으면 차트용으로 저장
                     if (data.rawType === 'trade' && volume > 0) {
                         addRealtimeTrade(ticker, price, volume, timestamp);
                     }
-                    
+
                     // currentQuote 업데이트 (실시간 주가 정보 반영)
                     updateQuoteFromWebSocket(ticker, price, volume, timestamp);
                 } catch (error) {
@@ -357,9 +357,9 @@ export default function AssetChart() {
             try {
                 // 차트에 업데이트 (이미 있으면 업데이트, 없으면 추가)
                 seriesRef.current.update(candle);
-                
+
                 // 마지막 캔들 참조 업데이트
-                if (!lastCandleRef.current || 
+                if (!lastCandleRef.current ||
                     (typeof lastCandleRef.current.time === 'number' ? lastCandleRef.current.time : Math.floor(new Date(lastCandleRef.current.time as string).getTime() / 1000)) < candleTime) {
                     lastCandleRef.current = candle;
                 }
@@ -385,8 +385,8 @@ export default function AssetChart() {
 
         // 실시간 trade 데이터가 없을 때만 가격 데이터로 업데이트
         const currentTime = Math.floor(Date.now() / 1000);
-        const lastCandleTime = typeof lastCandleRef.current.time === 'number' 
-            ? lastCandleRef.current.time 
+        const lastCandleTime = typeof lastCandleRef.current.time === 'number'
+            ? lastCandleRef.current.time
             : Math.floor(new Date(lastCandleRef.current.time as string).getTime() / 1000);
 
         const getTimeUnit = (tf: string): number => {
@@ -410,7 +410,7 @@ export default function AssetChart() {
                 low: Math.min(lastCandleRef.current.low, priceData.price),
             };
             lastCandleRef.current = updatedCandle;
-            
+
             try {
                 seriesRef.current.update(updatedCandle);
             } catch (error) {
@@ -449,12 +449,12 @@ export default function AssetChart() {
         if (chartRef.current) {
             return;
         }
-        
+
         // chartData가 없으면 초기화하지 않음 (컨테이너가 렌더링되지 않음)
         if (chartData.length === 0) {
             return;
         }
-        
+
         console.log('[AssetChart] 차트 초기화 시작...', { chartDataLength: chartData.length, timeframe });
 
         const isDark = theme === 'dark';
@@ -552,7 +552,7 @@ export default function AssetChart() {
                 default: return 2;
             }
         };
-        
+
         const candlestickSeries = chart.addSeries(CandlestickSeries, {
             upColor: '#ef4444',
             downColor: '#266bcaff',
@@ -567,18 +567,18 @@ export default function AssetChart() {
         seriesRef.current = candlestickSeries;
 
         console.log('[AssetChart] 차트 초기화 완료, chartData 대기 중:', chartData.length);
-        
+
         // 차트 초기화 직후 chartData가 있으면 즉시 설정
         if (chartData.length > 0) {
             try {
                 candlestickSeries.setData(chartData);
-                
+
                 // 최신 데이터 중심으로 보이도록 설정
                 const firstTime = chartData[0].time;
                 const lastTime = chartData[chartData.length - 1].time;
                 const firstTimeValue = typeof firstTime === 'number' ? firstTime : new Date(firstTime as string).getTime() / 1000;
                 const lastTimeValue = typeof lastTime === 'number' ? lastTime : new Date(lastTime as string).getTime() / 1000;
-                
+
                 // timeframe에 따라 보이는 범위 결정
                 // 'all' 선택 시 전체 데이터 표시, 그 외에는 최신 데이터 중심으로 표시
                 if (timeframe === 'all') {
@@ -589,27 +589,27 @@ export default function AssetChart() {
                     const getVisibleRange = (tf: string, firstTimestamp: number, lastTimestamp: number): { from: number; to: number } => {
                         const now = Math.floor(Date.now() / 1000);
                         let visibleDays = 30;
-                        
+
                         switch (tf) {
                             case 'd': visibleDays = 30; break; // 일봉: 최근 30일
                             case 'w': visibleDays = 84; break; // 주봉: 최근 12주 (84일)
                             case 'm': visibleDays = 365; break; // 월봉: 최근 12개월 (365일)
                         }
-                        
+
                         // 최신 데이터 중심으로, 데이터가 있는 범위 내에서만
                         const to = Math.min(lastTimeValue, now);
                         const from = Math.max(lastTimeValue - (visibleDays * 86400), firstTimeValue);
-                        
+
                         return { from, to };
                     };
-                    
+
                     const visibleRange = getVisibleRange(timeframe, firstTimeValue, lastTimeValue);
                     chart.timeScale().setVisibleRange({
                         from: visibleRange.from as Time,
                         to: visibleRange.to as Time,
                     });
                 }
-                
+
                 // 시간 축이 제대로 표시되도록 차트 크기 재조정 (공식 문서 권장)
                 // 차트가 렌더링된 후 시간 축이 잘리지 않도록 보장
                 setTimeout(() => {
@@ -620,7 +620,7 @@ export default function AssetChart() {
                         }
                     }
                 }, 100);
-                
+
                 console.log('[AssetChart] 차트 초기화 후 즉시 데이터 설정 완료:', chartData.length);
             } catch (err) {
                 console.error('[AssetChart] 차트 초기화 후 데이터 설정 실패:', err);
@@ -653,55 +653,55 @@ export default function AssetChart() {
         if (seriesRef.current && chartData.length > 0 && chartRef.current) {
             try {
                 seriesRef.current.setData(chartData);
-                
+
                 // 최신 데이터 중심으로 보이도록 설정
                 const firstTime = chartData[0].time;
                 const lastTime = chartData[chartData.length - 1].time;
                 const firstTimeValue = typeof firstTime === 'number' ? firstTime : new Date(firstTime as string).getTime() / 1000;
                 const lastTimeValue = typeof lastTime === 'number' ? lastTime : new Date(lastTime as string).getTime() / 1000;
-                
-                    // timeframe에 따라 보이는 범위 결정
-                    // 'all' 선택 시 전체 데이터 표시, 그 외에는 최신 데이터 중심으로 표시
-                    if (timeframe === 'all') {
-                        // 전체 데이터 표시
-                        chartRef.current.timeScale().fitContent();
-                    } else {
-                        // timeframe에 따라 보이는 범위 결정 (최신 데이터 중심)
-                        const getVisibleRange = (tf: string, firstTimestamp: number, lastTimestamp: number): { from: number; to: number } => {
-                            const now = Math.floor(Date.now() / 1000);
-                            let visibleDays = 30;
-                            
-                            switch (tf) {
-                                case 'd': visibleDays = 30; break; // 일봉: 최근 30일
-                                case 'w': visibleDays = 84; break; // 주봉: 최근 12주 (84일)
-                                case 'm': visibleDays = 365; break; // 월봉: 최근 12개월 (365일)
-                            }
-                            
-                            // 최신 데이터 중심으로, 데이터가 있는 범위 내에서만
-                            const to = Math.min(lastTimeValue, now);
-                            const from = Math.max(lastTimeValue - (visibleDays * 86400), firstTimestamp);
-                            
-                            return { from, to };
-                        };
-                        
-                        const visibleRange = getVisibleRange(timeframe, firstTimeValue, lastTimeValue);
-                        chartRef.current.timeScale().setVisibleRange({
-                            from: visibleRange.from as Time,
-                            to: visibleRange.to as Time,
-                        });
-                    }
-                    
-                    // 시간 축이 제대로 표시되도록 차트 크기 재조정 (공식 문서 권장)
-                    // 차트가 렌더링된 후 시간 축이 잘리지 않도록 보장
-                    setTimeout(() => {
-                        if (chartRef.current && chartContainerRef.current) {
-                            const containerHeight = chartContainerRef.current.clientHeight;
-                            if (containerHeight > 0) {
-                                chartRef.current.applyOptions({ height: containerHeight });
-                            }
+
+                // timeframe에 따라 보이는 범위 결정
+                // 'all' 선택 시 전체 데이터 표시, 그 외에는 최신 데이터 중심으로 표시
+                if (timeframe === 'all') {
+                    // 전체 데이터 표시
+                    chartRef.current.timeScale().fitContent();
+                } else {
+                    // timeframe에 따라 보이는 범위 결정 (최신 데이터 중심)
+                    const getVisibleRange = (tf: string, firstTimestamp: number, lastTimestamp: number): { from: number; to: number } => {
+                        const now = Math.floor(Date.now() / 1000);
+                        let visibleDays = 30;
+
+                        switch (tf) {
+                            case 'd': visibleDays = 30; break; // 일봉: 최근 30일
+                            case 'w': visibleDays = 84; break; // 주봉: 최근 12주 (84일)
+                            case 'm': visibleDays = 365; break; // 월봉: 최근 12개월 (365일)
                         }
-                    }, 100);
-                
+
+                        // 최신 데이터 중심으로, 데이터가 있는 범위 내에서만
+                        const to = Math.min(lastTimeValue, now);
+                        const from = Math.max(lastTimeValue - (visibleDays * 86400), firstTimestamp);
+
+                        return { from, to };
+                    };
+
+                    const visibleRange = getVisibleRange(timeframe, firstTimeValue, lastTimeValue);
+                    chartRef.current.timeScale().setVisibleRange({
+                        from: visibleRange.from as Time,
+                        to: visibleRange.to as Time,
+                    });
+                }
+
+                // 시간 축이 제대로 표시되도록 차트 크기 재조정 (공식 문서 권장)
+                // 차트가 렌더링된 후 시간 축이 잘리지 않도록 보장
+                setTimeout(() => {
+                    if (chartRef.current && chartContainerRef.current) {
+                        const containerHeight = chartContainerRef.current.clientHeight;
+                        if (containerHeight > 0) {
+                            chartRef.current.applyOptions({ height: containerHeight });
+                        }
+                    }
+                }, 100);
+
                 console.log('[AssetChart] chartData 변경으로 차트 업데이트 완료:', chartData.length);
             } catch (err) {
                 console.error('[AssetChart] 차트 업데이트 실패:', err);
@@ -805,8 +805,8 @@ export default function AssetChart() {
                     <div className="flex items-center gap-3">
                         {/* 가격 정보는 WebSocket으로 실시간 업데이트 (EOD 기준) */}
                         <span className="text-2xl font-bold text-foreground tracking-tighter">
-                            ${displayData?.price && displayData.price > 0 
-                                ? displayData.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) 
+                            ${displayData?.price && displayData.price > 0
+                                ? displayData.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
                                 : '--'}
                         </span>
                         {displayData && displayData.price && displayData.price > 0 && (
@@ -838,7 +838,7 @@ export default function AssetChart() {
                         { label: 'D', value: 'd', description: '일봉' },
                         { label: 'W', value: 'w', description: '주봉' },
                         { label: 'M', value: 'm', description: '월봉' },
-                        { label: '(전체)', value: 'all', description: '전체 데이터' },
+                        { label: '전체', value: 'all', description: '전체 데이터' },
                     ].map(({ label, value }) => (
                         <button
                             key={value}
@@ -846,11 +846,10 @@ export default function AssetChart() {
                                 setTimeframe(value);
                                 // timeframe 변경 시 useEffect가 자동으로 fetchCandles 호출하므로 중복 호출 제거
                             }}
-                            className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
-                                timeframe === value
-                                    ? 'bg-background shadow-sm text-foreground'
-                                    : 'text-muted-foreground hover:text-foreground hover:bg-background/50'
-                            }`}
+                            className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${timeframe === value
+                                ? 'bg-background shadow-sm text-foreground'
+                                : 'text-muted-foreground hover:text-foreground hover:bg-background/50'
+                                }`}
                         >
                             {label}
                         </button>
