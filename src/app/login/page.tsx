@@ -131,7 +131,7 @@ export default function LoginPage() {
         setIsLoading(true);
         try {
             const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
-            
+
             if (!googleClientId) {
                 console.error('Google Client ID not configured');
                 // SDK가 없으면 Backend Redirect 방식
@@ -146,7 +146,7 @@ export default function LoginPage() {
                         resolve();
                         return;
                     }
-                    
+
                     let attempts = 0;
                     const checkInterval = setInterval(() => {
                         attempts++;
@@ -163,7 +163,7 @@ export default function LoginPage() {
 
             try {
                 await waitForGoogleSDK();
-                
+
                 window.google!.accounts.id.initialize({
                     client_id: googleClientId,
                     callback: async (response) => {
@@ -182,7 +182,7 @@ export default function LoginPage() {
                         }
                     },
                 });
-                
+
                 // 직접 로그인 트리거
                 window.google!.accounts.id.prompt((notification) => {
                     if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
@@ -228,109 +228,223 @@ export default function LoginPage() {
                 }}
             />
 
-            <div className="flex items-center justify-center min-h-screen relative overflow-hidden p-4 bg-[#0F0F12]" suppressHydrationWarning>
-                {/* Background Decor */}
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-[radial-gradient(circle,rgba(124,58,237,0.15)_0%,rgba(10,10,12,0)_70%)] -z-10 pointer-events-none" suppressHydrationWarning />
+            <div className="min-h-screen bg-[#0F0F12] flex items-center justify-center p-4 relative overflow-hidden" suppressHydrationWarning>
+                {/* Global Background Decor */}
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-[radial-gradient(circle,rgba(124,58,237,0.05)_0%,rgba(10,10,12,0)_70%)] -z-10 pointer-events-none" />
 
-            <div className="w-full max-w-[420px] p-10 rounded-2xl flex flex-col gap-8 shadow-2xl bg-[#16161d] border border-white/10">
-                {/* Header */}
-                <div className="text-center">
-                    <h1 className="text-3xl font-bold mb-2 bg-gradient-to-r from-[var(--accent-gold)] to-[var(--accent-purple)] bg-clip-text text-transparent">
-                        Stock&Fortune
-                    </h1>
-                    <p className="text-gray-400 text-sm">
-                        Begin your fortune journey.
-                    </p>
-                </div>
+                <div className="w-full max-w-[1920px] grid grid-cols-1 lg:grid-cols-2 items-center gap-12 px-8 lg:px-24 relative z-10 lg:translate-x-10">
 
-                {/* Form */}
-                <form className="flex flex-col gap-4" onSubmit={handleEmailLogin}>
-                    <div>
-                        <label className="block text-xs text-gray-400 mb-1">Email</label>
-                        <input
-                            type="email"
-                            className="w-full bg-[#1E1E24] border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-[var(--accent-purple)] transition-colors"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            placeholder="oracle@example.com"
-                        />
+                    {/* Left Panel - Branding/Logo Area */}
+                    <div className="w-full flex flex-col items-center justify-center text-center lg:translate-x-10 lg:-translate-y-20">
+                        <div className="relative w-[320px] h-[320px] lg:w-[700px] lg:h-[700px] animate-fade-in duration-700">
+                            {/* Rotating Gold Spell Aura */}
+                            {/* Magic Circle SVG */}
+                            <svg
+                                className="absolute inset-0 w-full h-full animate-spin-pause opacity-60 scale-90"
+                                viewBox="0 0 400 400"
+                                xmlns="http://www.w3.org/2000/svg"
+                            >
+                                <defs>
+                                    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="100%">
+                                        <stop offset="0%" stopColor="#FFE9A6" />
+                                        <stop offset="50%" stopColor="#FFD36A" />
+                                        <stop offset="100%" stopColor="#B8922E" />
+                                    </linearGradient>
+
+                                    <filter id="glow">
+                                        <feGaussianBlur stdDeviation="2.5" result="blur" />
+                                        <feMerge>
+                                            <feMergeNode in="blur" />
+                                            <feMergeNode in="SourceGraphic" />
+                                        </feMerge>
+                                    </filter>
+                                </defs>
+
+                                {/* Outer Circle */}
+                                <circle cx="200" cy="200" r="155"
+                                    fill="none"
+                                    stroke="url(#gold)"
+                                    strokeWidth="2"
+                                    filter="url(#glow)"
+                                />
+
+                                {/* Rune Circle */}
+                                <circle cx="200" cy="200" r="140"
+                                    fill="none"
+                                    stroke="url(#gold)"
+                                    strokeWidth="1.5"
+                                    strokeDasharray="4 10"
+                                    opacity="0.8"
+                                />
+
+                                {/* Inner Circle */}
+                                <circle cx="200" cy="200" r="130"
+                                    fill="none"
+                                    stroke="url(#gold)"
+                                    strokeWidth="1.2"
+                                    opacity="0.9"
+                                />
+
+                                {/* Hexagram */}
+                                <polygon
+                                    points="200,60 321,270 79,270"
+                                    fill="none"
+                                    stroke="url(#gold)"
+                                    strokeWidth="1.5"
+                                />
+
+                                <polygon
+                                    points="200,340 321,130 79,130"
+                                    fill="none"
+                                    stroke="url(#gold)"
+                                    strokeWidth="1.5"
+                                />
+
+                                {/* Center Circle */}
+                                <circle cx="200" cy="200" r="45"
+                                    fill="none"
+                                    stroke="url(#gold)"
+                                    strokeWidth="1.5"
+                                />
+
+                                {/* Rune Dots */}
+                                <g fill="#FFD36A">
+                                    {/* Cardinal Dots (between Outer and Rune): r = 150 */}
+                                    <circle cx="200" cy="50" r="3" />
+                                    <circle cx="350" cy="200" r="3" />
+                                    <circle cx="200" cy="350" r="3" />
+                                    <circle cx="50" cy="200" r="3" />
+
+                                    {/* Diagonal Dots (on Rune circle): r = 140 */}
+                                    <circle cx="299" cy="101" r="2.5" />
+                                    <circle cx="101" cy="299" r="2.5" />
+                                    <circle cx="101" cy="101" r="2.5" />
+                                    <circle cx="299" cy="299" r="2.5" />
+                                </g>
+                            </svg>
+                            <Image
+                                src="/jusulsa-logo.png"
+                                alt="Jusulsa Logo"
+                                fill
+                                className="object-contain rounded-full drop-shadow-[0_0_55px_rgba(234,179,8,0.5)] relative z-10"
+                                priority
+                            />
+                        </div>
+                        <div className="animate-slide-up -mt-10 lg:-mt-25 relative z-20">
+                            <p className="text-gray-400 text-xl lg:text-lg font-base tracking-wide ">
+                                주식이 술술 풀리는 사람들
+                            </p>
+                        </div>
                     </div>
-                    <div>
-                        <label className="block text-xs text-gray-400 mb-1">Password</label>
-                        <input
-                            type="password"
-                            className="w-full bg-[#1E1E24] border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-[var(--accent-purple)] transition-colors"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            placeholder="••••••••"
-                        />
+
+                    {/* Right Panel - Login Form */}
+                    <div className="w-full lg:w-[420px] lg:ml-20 relative animate-fade-in-up delay-200">
+                        {/* Card Background Decor */}
+                        <div className="absolute inset-0 bg-gradient-to-b from-amber-500/5 to-transparent rounded-3xl -z-10 blur-2xl opacity-40" />
+
+                        <div className="w-full p-8 rounded-3xl flex flex-col gap-6 shadow-[0_0_50px_rgba(0,0,0,0.5)] bg-[#121216]/90 border border-[#D4AF37]/20 backdrop-blur-xl ring-1 ring-white/5">
+                            {/* Header */}
+                            <div className="text-center mb-2">
+                                <h1 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-[#D4AF37] via-[#B8860B] to-[#996515]">
+                                    Welcome Back
+                                </h1>
+                                <p className="text-gray-500 text-sm font-medium mt-1">주술사의 세계로 오신 것을 환영합니다</p>
+                            </div>
+
+                            {/* Form */}
+                            <form className="flex flex-col gap-5" onSubmit={handleEmailLogin}>
+                                <div>
+                                    <label className="block text-sm text-[#D4AF37]/80 mb-1.5 ml-1 font-medium tracking-wide">이메일</label>
+                                    <div className="relative group">
+                                        <input
+                                            type="email"
+                                            className="w-full bg-[#0a0a0c] border border-[#D4AF37]/20 rounded-xl px-4 py-3.5 text-white placeholder-gray-500 outline-none focus:border-[#D4AF37]/50 focus:ring-1 focus:ring-[#D4AF37]/50 transition-all font-light group-hover:border-[#D4AF37]/40 placeholder:tracking-wider"
+                                            value={email}
+                                            onChange={(e) => setEmail(e.target.value)}
+                                            placeholder="jusulsa@email.com"
+                                        />
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="block text-sm text-[#D4AF37]/80 mb-1.5 ml-1 font-medium tracking-wide">비밀번호</label>
+                                    <div className="relative group">
+                                        <input
+                                            type="password"
+                                            className="w-full bg-[#0a0a0c] border border-[#D4AF37]/20 rounded-xl px-4 py-3.5 text-white placeholder-gray-500 outline-none focus:border-[#D4AF37]/50 focus:ring-1 focus:ring-[#D4AF37]/50 transition-all font-light group-hover:border-[#D4AF37]/40 placeholder:tracking-wider"
+                                            value={password}
+                                            onChange={(e) => setPassword(e.target.value)}
+                                            placeholder="••••••••"
+                                        />
+                                    </div>
+                                </div>
+
+                                {authError && (
+                                    <p className="text-red-400 text-xs text-center bg-red-500/10 py-2 rounded-lg border border-red-500/20 animate-pulse">{authError}</p>
+                                )}
+
+                                <button
+                                    type="submit"
+                                    disabled={isLoading}
+                                    className="relative w-full h-12 mt-6 rounded-xl bg-[linear-gradient(135deg,rgba(255,215,0,0.25),rgba(255,215,0,0.05))] backdrop-blur-md border border-[rgba(255,215,0,0.35)] text-[#B8860B] font-semibold tracking-wide shadow-[0_0_25px_rgba(255,215,0,0.2)] transition-all duration-300 hover:shadow-[0_0_40px_rgba(255,215,0,0.4)] hover:border-[#B8860B] hover:text-[#B8860B] hover:brightness-110 active:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    {isLoading ? "로그인 중..." : "로그인하기"}
+                                </button>
+                            </form>
+
+                            {/* Divider */}
+                            <div className="flex items-center text-gray-600 text-[10px] font-bold tracking-wider my-1 before:content-[''] before:flex-1 before:h-px before:bg-white/10 after:content-[''] after:flex-1 after:h-px after:bg-white/10">
+                                <span className="px-4">OR</span>
+                            </div>
+
+                            {/* Guest Login (Dev Mode) */}
+                            <button
+                                type="button"
+                                onClick={async () => {
+                                    await loginAsGuest();
+                                    router.push('/');
+                                }}
+                                className="w-full py-2.5 bg-white/5 text-gray-400 font-medium rounded-xl hover:bg-white/10 transition-colors border border-white/5 text-sm hover:text-white"
+                            >
+                                게스트 로그인
+                            </button>
+
+                            {/* Social Login */}
+                            <div className="flex gap-3">
+                                <button
+                                    type="button"
+                                    onClick={handleGoogleLogin}
+                                    disabled={isLoading}
+                                    className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-white text-black font-medium rounded-xl hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm shadow-sm"
+                                >
+                                    <Image src="/google.svg" alt="Google" width={18} height={18} />
+                                    Google
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleKakaoLoginSDK}
+                                    disabled={isLoading}
+                                    className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-[#FEE500] text-black font-medium rounded-xl hover:bg-[#FDD835] transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm shadow-sm"
+                                >
+                                    <Image src="/kakao.svg" alt="Kakao" width={18} height={18} />
+                                    Kakao
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Footer Toggle */}
+                        <div className="text-center text-xs text-gray-500 mt-6">
+                            <p>
+                                계정이 없으신가요?
+                                <Link
+                                    href="/signup"
+                                    className="bg-transparent border-none text-amber-400 font-semibold cursor-pointer ml-2 hover:text-amber-300 hover:underline transition-colors"
+                                >
+                                    회원가입
+                                </Link>
+                            </p>
+                        </div>
                     </div>
-
-                    {authError && (
-                        <p className="text-red-500 text-sm">{authError}</p>
-                    )}
-
-                    <button
-                        type="submit"
-                        disabled={isLoading}
-                        className="w-full py-3 bg-[var(--accent-purple)] text-white font-bold rounded-xl hover:brightness-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        {isLoading ? "Signing In..." : "Sign In"}
-                    </button>
-                </form>
-
-                {/* Divider */}
-                <div className="flex items-center text-gray-600 text-xs font-semibold before:content-[''] before:flex-1 before:h-px before:bg-white/10 after:content-[''] after:flex-1 after:h-px after:bg-white/10">
-                    <span className="px-4">OR CONTINUE WITH</span>
                 </div>
-
-                {/* Guest Login (Dev Mode) */}
-                <button
-                    type="button"
-                    onClick={async () => {
-                        await loginAsGuest();
-                        router.push('/');
-                    }}
-                    className="w-full py-2.5 mb-3 bg-white/10 text-gray-300 font-medium rounded-xl hover:bg-white/20 transition-colors border border-white/10"
-                >
-                    Guest Login (Dev Mode)
-                </button>
-
-                {/* Social Login */}
-                <div className="flex gap-3">
-                    <button
-                        type="button"
-                        onClick={handleGoogleLogin}
-                        disabled={isLoading}
-                        className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-white text-black font-medium rounded-xl hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        <Image src="/google.svg" alt="Google" width={20} height={20} />
-                        Google
-                    </button>
-                    <button
-                        type="button"
-                        onClick={handleKakaoLoginSDK}
-                        disabled={isLoading}
-                        className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-[#FEE500] text-black font-medium rounded-xl hover:bg-[#FDD835] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        <Image src="/kakao.svg" alt="Kakao" width={20} height={20} />
-                        Kakao
-                    </button>
-                </div>
-
-                {/* Footer Toggle */}
-                <div className="text-center text-sm text-gray-400 mt-4">
-                    <p>
-                        Don't have an account?
-                        <Link
-                            href="/signup"
-                            className="bg-transparent border-none text-cyan-400 font-semibold cursor-pointer ml-2 hover:text-white hover:underline transition-colors"
-                        >
-                            Sign up
-                        </Link>
-                    </p>
-                </div>
-            </div>
             </div>
         </>
     );

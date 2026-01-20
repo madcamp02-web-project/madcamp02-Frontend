@@ -118,7 +118,7 @@ export default function OnboardingPage() {
         <div className="flex items-center justify-center min-h-screen bg-[var(--bg-main)] relative overflow-hidden p-4" suppressHydrationWarning>
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[120vw] h-[120vh] bg-[radial-gradient(circle_at_center,rgba(147,51,234,0.15)_0%,transparent_60%)] pointer-events-none z-0" />
 
-            <div className="w-full max-w-[500px] min-h-[600px] p-10 flex flex-col relative z-10 glass-panel shadow-2xl rounded-3xl">
+            <div className="w-full max-w-[500px] min-h-[600px] p-10 flex flex-col relative z-10 glass-panel shadow-2xl rounded-3xl mb-20">
                 {/* Progress Indicator */}
                 {currentStep !== "analyzing" && currentStep !== "result" && (
                     <div className="flex justify-center gap-2 mb-8">
@@ -144,7 +144,7 @@ export default function OnboardingPage() {
                                 </div>
                             )}
                             <Input
-                                label="Nickname"
+                                label="닉네임"
                                 placeholder="투자도사"
                                 value={formData.nickname}
                                 onChange={(e) => setFormData({ ...formData, nickname: e.target.value })}
@@ -153,7 +153,7 @@ export default function OnboardingPage() {
                                 <p className="mt-1 text-xs text-red-400">{fieldErrors.nickname}</p>
                             )}
                             <div>
-                                <label className="text-sm text-gray-400 mb-2 block">Birth Date</label>
+                                <label className="text-sm text-gray-400 mb-2 block">생년월일</label>
                                 <input
                                     type="date"
                                     className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white outline-none transition-all focus:border-[var(--accent-purple)] focus:shadow-[0_0_15px_rgba(147,51,234,0.2)] icon-invert"
@@ -165,7 +165,7 @@ export default function OnboardingPage() {
                                 )}
                             </div>
                             <div>
-                                <label className="text-sm text-gray-400 mb-2 block">Birth Time (Optional)</label>
+                                <label className="text-sm text-gray-400 mb-2 block">태어난 시각</label>
                                 <input
                                     type="time"
                                     className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white outline-none transition-all focus:border-[var(--accent-purple)] focus:shadow-[0_0_15px_rgba(147,51,234,0.2)] icon-invert"
@@ -177,23 +177,21 @@ export default function OnboardingPage() {
                                 )}
                             </div>
                             <div>
-                                <label className="text-sm text-gray-400 mb-2 block">Gender (필수)</label>
+                                <label className="text-sm text-gray-400 mb-2 block">성별</label>
                                 <select
                                     className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white outline-none transition-all focus:border-[var(--accent-purple)] focus:shadow-[0_0_15px_rgba(147,51,234,0.2)] icon-invert"
                                     value={formData.gender}
                                     onChange={(e) => setFormData({ ...formData, gender: e.target.value as "MALE" | "FEMALE" | "OTHER" })}
                                 >
-                                    <option value="">선택하세요</option>
                                     <option value="MALE">남성</option>
                                     <option value="FEMALE">여성</option>
-                                    <option value="OTHER">기타</option>
                                 </select>
                                 {fieldErrors.gender && (
                                     <p className="mt-1 text-xs text-red-400">{fieldErrors.gender}</p>
                                 )}
                             </div>
                             <div>
-                                <label className="text-sm text-gray-400 mb-2 block">Calendar Type (필수)</label>
+                                <label className="text-sm text-gray-400 mb-2 block">음양력 선택</label>
                                 <select
                                     className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white outline-none transition-all focus:border-[var(--accent-purple)] focus:shadow-[0_0_15px_rgba(147,51,234,0.2)] icon-invert"
                                     value={formData.calendarType}
@@ -209,16 +207,20 @@ export default function OnboardingPage() {
                             </div>
                         </div>
 
-                        <Button variant="primary" onClick={handleNext} disabled={!formData.nickname || !formData.birthDate || !formData.gender}>
+                        <button
+                            onClick={handleNext}
+                            disabled={!formData.nickname || !formData.birthDate || !formData.gender}
+                            className="relative w-full h-12 mt-6 rounded-xl bg-[linear-gradient(135deg,rgba(255,215,0,0.25),rgba(255,215,0,0.05))] backdrop-blur-md border border-[rgba(255,215,0,0.35)] text-[#B8860B] font-semibold tracking-wide shadow-[0_0_25px_rgba(255,215,0,0.2)] transition-all duration-300 hover:shadow-[0_0_40px_rgba(255,215,0,0.4)] hover:border-[#B8860B] hover:text-[#B8860B] hover:brightness-110 active:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
                             Next Step
-                        </Button>
+                        </button>
                     </div>
                 )}
 
                 {/* Step 2: Investment Style Survey */}
                 {currentStep === "survey" && (
                     <div className="flex-1 flex flex-col animate-in fade-in slide-in-from-bottom-4 duration-500">
-                        <div className="text-center mb-8">
+                        <div className="text-center mb-14">
                             <h1 className="text-3xl font-bold mb-2 text-white font-heading">Investment Style</h1>
                             <p className="text-gray-400 text-sm font-body">
                                 평소 당신의 투자 성향은 어떤가요?
@@ -231,33 +233,39 @@ export default function OnboardingPage() {
                             </div>
                         )}
 
-                        <div className="flex flex-col gap-4 flex-1 overflow-y-auto">
+                        <div className="flex flex-col gap-6 flex-1 overflow-y-auto">
                             {["안전 제일! 예적금이 최고야 🛡️", "적당한 수익, 적당한 위험 ⚖️", "인생은 한방! 고위험 고수익 🔥"].map((option, idx) => (
                                 <div
                                     key={idx}
-                                    className={`p-4 rounded-xl border flex items-center gap-4 cursor-pointer transition-all ${formData.investmentStyle === option
-                                        ? "bg-[rgba(147,51,234,0.1)] border-[var(--accent-purple)]"
+                                    className={`p-4 rounded-xl border flex items-center gap-6 cursor-pointer transition-all ${formData.investmentStyle === option
+                                        ? "bg-white/10 border-white shadow-[0_0_15px_rgba(255,255,255,0.15)]"
                                         : "bg-white/5 border-white/10 hover:bg-white/10"
                                         }`}
                                     onClick={() => setFormData({ ...formData, investmentStyle: option })}
                                 >
-                                    <div className="w-5 h-5 rounded-full border-2 border-gray-500 relative flex items-center justify-center">
+                                    <div className={`w-5 h-5 rounded-full border-2 relative flex items-center justify-center transition-colors ${formData.investmentStyle === option ? "border-white" : "border-gray-500"
+                                        }`}>
                                         {formData.investmentStyle === option && (
-                                            <div className="w-2.5 h-2.5 bg-[var(--accent-purple)] rounded-full" />
+                                            <div className="w-2.5 h-2.5 bg-white rounded-full shadow-[0_0_8px_rgba(255,255,255,0.8)]" />
                                         )}
                                     </div>
-                                    <span className="text-white">{option}</span>
+                                    <span className={`transition-colors ${formData.investmentStyle === option ? "text-white font-bold" : "text-gray-400"
+                                        }`}>{option}</span>
                                 </div>
                             ))}
                         </div>
 
                         <div className="flex gap-4 mt-auto">
-                            <Button variant="secondary" onClick={handleBack}>
+                            <Button variant="secondary" onClick={handleBack} className="flex-1 h-12 rounded-xl">
                                 Back
                             </Button>
-                            <Button variant="primary" onClick={handleNext} disabled={!formData.investmentStyle || isLoading}>
+                            <button
+                                onClick={handleNext}
+                                disabled={!formData.investmentStyle || isLoading}
+                                className="relative flex-1 h-12 rounded-xl bg-[linear-gradient(135deg,rgba(255,215,0,0.25),rgba(255,215,0,0.05))] backdrop-blur-md border border-[rgba(255,215,0,0.35)] text-[#B8860B] font-semibold tracking-wide shadow-[0_0_25px_rgba(255,215,0,0.2)] transition-all duration-300 hover:shadow-[0_0_40px_rgba(255,215,0,0.4)] hover:border-[#B8860B] hover:text-[#B8860B] hover:brightness-110 active:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
                                 {isLoading ? "Analyzing..." : "Analyze Fate"}
-                            </Button>
+                            </button>
                         </div>
                     </div>
                 )}
@@ -284,7 +292,7 @@ export default function OnboardingPage() {
                         </div>
 
                         <div className="bg-[rgba(255,255,255,0.05)] p-6 rounded-2xl border border-[var(--accent-gold)] text-center mb-8">
-                            <div className="text-4xl mb-4">
+                            <div className="text-9xl mb-6">
                                 {result.element === 'FIRE' ? '🔥' :
                                     result.element === 'WATER' ? '💧' :
                                         result.element === 'WOOD' ? '🌳' :
@@ -301,9 +309,12 @@ export default function OnboardingPage() {
                             </div>
                         </div>
 
-                        <Button variant="primary" onClick={() => router.push("/")}>
+                        <button
+                            onClick={() => router.push("/")}
+                            className="relative w-full h-12 mt-6 rounded-xl bg-[linear-gradient(135deg,rgba(255,215,0,0.25),rgba(255,215,0,0.05))] backdrop-blur-md border border-[rgba(255,215,0,0.35)] text-[#B8860B] font-semibold tracking-wide shadow-[0_0_25px_rgba(255,215,0,0.2)] transition-all duration-300 hover:shadow-[0_0_40px_rgba(255,215,0,0.4)] hover:border-[#B8860B] hover:text-[#B8860B] hover:brightness-110 active:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
                             Enter Dashboard 🚀
-                        </Button>
+                        </button>
                     </div>
                 )}
             </div>
