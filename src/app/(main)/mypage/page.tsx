@@ -202,27 +202,29 @@ export default function MyPage() {
                                 </div>
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
-                                        <label className="block text-muted-foreground text-xs mb-1.5">생년월일 (사주 계산)</label>
+                                        <label className="block text-muted-foreground text-xs mb-1.5">생년월일 (온보딩)</label>
                                         <input
                                             type="date"
                                             value={profile?.birthDate || ''}
-                                            onChange={(e) => updateProfile({ birthDate: e.target.value })}
-                                            className="w-full bg-secondary border border-border rounded-xl px-4 py-3 text-foreground text-sm outline-none focus:border-purple-500 transition-colors"
+                                            readOnly
+                                            className="w-full bg-secondary border border-border rounded-xl px-4 py-3 text-foreground text-sm outline-none cursor-default"
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-muted-foreground text-xs mb-1.5">태어난 시각</label>
+                                        <label className="block text-muted-foreground text-xs mb-1.5">태어난 시각 (온보딩)</label>
                                         <input
                                             type="time"
                                             value={profile?.birthTime || ''}
-                                            onChange={(e) => updateProfile({ birthTime: e.target.value })}
-                                            className="w-full bg-secondary border border-border rounded-xl px-4 py-3 text-foreground text-sm outline-none focus:border-purple-500 transition-colors"
+                                            readOnly
+                                            className="w-full bg-secondary border border-border rounded-xl px-4 py-3 text-foreground text-sm outline-none cursor-default"
                                         />
                                     </div>
                                 </div>
-                                <button className="w-full py-3 bg-gradient-to-r from-yellow-500 to-orange-500 text-black font-bold rounded-xl hover:brightness-110 transition-all shadow-lg shadow-orange-500/20 mt-2">
-                                    저장하기
-                                </button>
+                                {/* 온보딩 기반 사주 정보는 1차 버전에서는 읽기 전용으로만 노출 */}
+                                <div className="mt-3 text-xs text-muted-foreground space-y-1">
+                                    <p>사주 오행: <span className="font-semibold text-foreground">{profile?.sajuElement || '미설정'}</span></p>
+                                    <p>띠: <span className="font-semibold text-foreground">{profile?.zodiacSign || '미설정'}</span></p>
+                                </div>
                             </div>
                         </div>
 

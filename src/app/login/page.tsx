@@ -6,6 +6,7 @@ import Image from "next/image";
 import Link from "next/link";
 import Script from "next/script";
 import { useAuthStore } from "@/stores/auth-store";
+import { hasCompletedOnboarding } from "@/lib/utils";
 
 // Backend URL for Option A (Redirection)
 const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
@@ -85,8 +86,12 @@ export default function LoginPage() {
                         try {
                             const { loginWithKakao } = useAuthStore.getState();
                             const isNewUser = await loginWithKakao(authObj.access_token);
-                            // 신규 사용자는 온보딩으로, 기존 사용자는 홈으로
-                            router.push(isNewUser ? '/onboarding' : '/');
+
+                            // 온보딩 필요 여부는 isNewUser + 프로필 상태를 함께 사용
+                            const state = useAuthStore.getState();
+                            const needOnboarding = isNewUser || !hasCompletedOnboarding(state.user);
+
+                            router.push(needOnboarding ? '/onboarding' : '/');
                         } catch (err) {
                             console.error('Kakao login error:', err);
                         } finally {
@@ -152,8 +157,12 @@ export default function LoginPage() {
                         try {
                             const { loginWithGoogle } = useAuthStore.getState();
                             const isNewUser = await loginWithGoogle(response.credential);
-                            // 신규 사용자는 온보딩으로, 기존 사용자는 홈으로
-                            router.push(isNewUser ? '/onboarding' : '/');
+
+                            // 온보딩 필요 여부는 isNewUser + 프로필 상태를 함께 사용
+                            const state = useAuthStore.getState();
+                            const needOnboarding = isNewUser || !hasCompletedOnboarding(state.user);
+
+                            router.push(needOnboarding ? '/onboarding' : '/');
                         } catch (err) {
                             console.error('Google login error:', err);
                             setIsLoading(false);

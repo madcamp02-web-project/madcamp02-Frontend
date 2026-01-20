@@ -6,11 +6,13 @@ import { Button } from "@/components/ui/Button";
 import { userApi } from "@/lib/api/user";
 import { SajuInfo } from "@/types/user";
 import { useRouter } from "next/navigation";
+import { useAuthStore } from "@/stores/auth-store";
 
 type OnboardingStep = "profile" | "survey" | "analyzing" | "result";
 
 export default function OnboardingPage() {
     const router = useRouter();
+    const { checkAuth } = useAuthStore();
     const [currentStep, setCurrentStep] = useState<OnboardingStep>("profile");
     const [formData, setFormData] = useState({
         nickname: "",
@@ -60,6 +62,13 @@ export default function OnboardingPage() {
                         animal: '호랑이',
                         luck: '운명적 투자 성향 분석 완료',
                     });
+                }
+
+                // 온보딩으로 users.* 사주 필드가 갱신되었으므로, /user/me를 다시 조회해 전역 상태를 최신으로 맞춘다.
+                try {
+                    await checkAuth();
+                } catch (refreshError) {
+                    console.warn("[Onboarding] checkAuth after onboarding failed:", refreshError);
                 }
 
                 setTimeout(() => {

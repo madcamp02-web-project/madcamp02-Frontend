@@ -1,6 +1,6 @@
 # ⚙️ MadCamp02: 백엔드 개발 계획서
 
-**Ver 2.7.15 - Backend Development Blueprint (Spec-Driven Alignment)**
+**Ver 2.7.17 - Backend Development Blueprint (Spec-Driven Alignment)**
 
 ---
 
@@ -32,6 +32,8 @@
 | **2.7.13** | **2026-01-19** | **Phase 6 실행: Finnhub Trades WebSocket 연동 완료 - 싱글톤 클라이언트, 메시지 파싱/정규화, Redis/STOMP 브로드캐스트, destination 안전성 정책 고정** | **MadCamp02** |
 | **2.7.14** | **2026-01-19** | **Phase 4~6 구현 코드 기준 Game/Trade/Realtime(WebSocket) 정합성 재정리 및 상태 테이블/페이로드·destination 설명 보완** | **MadCamp02** |
 | **2.7.15** | **2026-01-19** | **Phase 3.6: 백엔드 Redis 캐싱 확장 (Market Indices/News/Movers) 및 프론트엔드 이중 캐싱 전략 수립** | **MadCamp02** |
+| **2.7.16** | **2026-01-19** | **Phase 3.4: Candles API 날짜 범위 필터링 구현 완료 내용 문서화 (period 필드, 배치 로드 전략, Quota 관리 상세 명세 추가)** | **MadCamp02** |
+| **2.7.17** | **2026-01-20** | **Kakao 동의 스코프를 `profile_nickname` 단일로 축소, 이메일 미요청 시 백엔드가 임의 이메일(`kakao-{timestamp}-{random}@auth.madcamp02.local`)을 생성·중복 검사 후 가입하도록 프로비저닝 로직 보강(하이브리드 OAuth 공통)** | **MadCamp02** |
 
 ### Ver 2.6 주요 변경 사항
 
@@ -303,6 +305,13 @@ MadCamp02는 다양한 클라이언트 환경(Web, Mobile, External)을 지원�
 - **장점**: 모바일 네이티브 SDK 활용 용이, 유연한 UI 제어.
 - **구현**: `AuthController`의 `kakaoLogin`, `googleLogin` 엔드포인트.
 
+#### C. Kakao 스코프·프로비저닝 규칙 (2026-01-20)
+
+- **동의 스코프**: `profile_nickname` **단일 필수**. `account_email` 요청 없음.
+- **이메일 처리**: Kakao 응답에 이메일이 없으면 백엔드가 `kakao-{timestamp}-{random}@auth.madcamp02.local` 형태로 생성하고, 중복 시 재생성하여 저장.
+- **닉네임 처리**: 닉네임이 비어 있으면 `kakao-user-{random}` 임의 닉네임 부여.
+- **가입/로그인 분기**: 이메일(임의 포함)로 사용자 조회 → 없으면 회원가입+지갑/기본 관심종목 생성, 있으면 로그인. 응답 `isNewUser`로 프론트가 온보딩(`/onboarding`) 리다이렉트 여부 결정.
+
 ---
 
 ## 8. 실시간 통신 (WebSocket)
@@ -348,7 +357,6 @@ MadCamp02는 다양한 클라이언트 환경(Web, Mobile, External)을 지원�
   - **⚠️ 무료 구독 제한**: **최근 1년 데이터만 제공** (무료 플랜)
     - 1년 이전 데이터 요청 시 `{"warning":"Data is limited by one year as you have free subscription"}` 경고 메시지 반환
     - 실제 캔들 데이터 없이 경고만 반환될 수 있으므로, 응답에서 `warning` 필드 체크 및 필터링 필요
-  - **⚠️ 최대 데이터 범위**: **최근 2년까지만 제공** (무료 플랜)
 - **전략**: 
   - **DB 캐싱**: `stock_candles` 테이블에 데이터 저장, API 응답은 항상 DB에서 제공
   - **Quota 관리**: `api_usage_logs` 테이블로 일일 호출 횟수 추적
@@ -357,46 +365,6 @@ MadCamp02는 다양한 클라이언트 환경(Web, Mobile, External)을 지원�
 - **Base URL**: `https://eodhd.com/api`
 - **엔드포인트**: `/eod/{ticker}?fmt=json`
 - **티커 형식**: `{SYMBOL}.{EXCHANGE_ID}` 형식 권장 (예: `AAPL.US`). 거래소 코드가 없으면 자동으로 `.US` 추가
-
-#### 9.2.1 EODHD API 파라미터 형식
-
-**공식 API 파라미터**:
-- `api_token`: API 키 (필수)
-- `fmt`: 출력 형식 (`csv`, `json`) - 기본값: `csv`
-- `period`: 데이터 주기 (`d` daily, `w` weekly, `m` monthly) - 기본값: `d`
-- `order`: 정렬 순서 (`a` ascending, `d` descending) - 기본값: `a`
-- `from`: 시작 날짜 (`YYYY-MM-DD` 형식)
-- `to`: 종료 날짜 (`YYYY-MM-DD` 형식)
-
-**예시 요청**:
-```
-GET https://eodhd.com/api/eod/MCD.US?api_token={API_KEY}&period=d&from=2017-01-05&to=2017-02-10&order=a&fmt=json
-```
-
-#### 9.2.2 프론트엔드 → 백엔드 API 파라미터
-
-**백엔드 엔드포인트**: `GET /api/v1/stock/candles/{ticker}`
-
-**파라미터**:
-- `ticker` (path, 필수): 종목 심볼
-- `resolution` (query, 필수): 시간 간격 (`1`, `5`, `15`, `30`, `60` 분봉, `D` 일봉, `W` 주봉, `M` 월봉)
-- `from` (query, 필수): 시작 시간 (ISO-8601 형식, 예: `2026-01-19T00:00:00Z`)
-- `to` (query, 필수): 종료 시간 (ISO-8601 형식, 예: `2026-01-19T23:59:59Z`)
-
-**프론트엔드 변환 로직**:
-- 프론트엔드는 `timeframe` ('1d', '1w', '1m', '3m', '1y')을 백엔드 API 형식으로 변환하여 전송
-- `1d` → `resolution=D&from={오늘-1일 ISO-8601}&to={오늘 ISO-8601}`
-- `1w` → `resolution=D&from={오늘-7일 ISO-8601}&to={오늘 ISO-8601}`
-- `1m` → `resolution=D&from={오늘-30일 ISO-8601}&to={오늘 ISO-8601}`
-- `3m` → `resolution=D&from={오늘-90일 ISO-8601}&to={오늘 ISO-8601}`
-- `1y` → `resolution=D&from={오늘-365일 ISO-8601}&to={오늘 ISO-8601}` (최대 2년 제한)
-
-**백엔드 동작**:
-1. 프론트엔드에서 받은 `resolution`, `from`, `to` 파라미터를 사용
-2. 백엔드 내부에서 EODHD API 형식으로 변환하여 호출
-3. EODHD API 호출: `GET https://eodhd.com/api/eod/{ticker}.US?period={period}&from={from}&to={to}&order=a&fmt=json&api_token={API_KEY}`
-4. 응답 데이터를 DB에 저장 (`stock_candles` 테이블)
-5. DB 데이터를 프론트엔드 응답 형식으로 변환하여 반환
 
 ### 9.3 FastAPI (AI 서버)
 
@@ -437,7 +405,7 @@ GET https://eodhd.com/api/eod/MCD.US?api_token={API_KEY}&period=d&from=2017-01-0
 | ---------- | ------ | -------------- | ------------------------------------------------------------------------------------------------------------------------- |
 | **Auth**   | 100%   | ✅ Complete    | Hybrid 인증 인터페이스(Backend/Frontend Driven) 확정. 프론트 `/oauth/callback` 및 토큰 저장/갱신 연동은 Phase 1에서 진행. |
 | **User**   | 80%    | ⚠️ Update Req  | 기본 엔티티 존재하나 `is_public` 등 신규 필드 누락됨.                                                                     |
-| **Market** | 0%     | ⬜ Pending     | Controller/Service 미구현.                                                                                                |
+| **Market** | 100%   | ✅ Complete    | Phase 3.4~3.6 구현 완료: Indices/News/Movers REST + Redis 캐싱, ETF 지수 규약 반영.                                      |
 | **Trade**  | 100%   | ✅ Complete    | Phase 4: Trade/Portfolio Engine 완전 구현(트랜잭션/비관적 락, 동시성 테스트 포함).                                         |
 | **Game**   | 100%   | ✅ Complete    | Phase 5 구현 완료(Shop/Gacha/Inventory/Ranking). 프론트는 현재 모의데이터 상태이므로 Phase 5.5에서 실데이터 연동 필요.    |
 | **Realtime**| 100%  | ✅ Complete    | Phase 6 완료: Finnhub Trades WebSocket + `/topic/stock.indices` + `/user/queue/trade` 브로드캐스트 구현 완료. Watchlist API 구현 완료. |
@@ -515,12 +483,6 @@ GET https://eodhd.com/api/eod/MCD.US?api_token={API_KEY}&period=d&from=2017-01-0
   - `GET /api/v1/stock/search`
   - `GET /api/v1/stock/quote/{ticker}`
   - `GET /api/v1/stock/candles/{ticker}` (EODHD + DB 캐싱)
-    - **파라미터**:
-      - `ticker` (path): 종목 심볼
-      - `resolution` (query, 필수): 시간 간격 (`1`, `5`, `15`, `30`, `60`, `D`, `W`, `M`)
-      - `from` (query, 필수): 시작 시간 (ISO-8601 형식, 예: `2026-01-19T00:00:00Z`)
-      - `to` (query, 필수): 종료 시간 (ISO-8601 형식, 예: `2026-01-19T23:59:59Z`)
-    - **프론트엔드 변환**: `timeframe` ('1d', '1w', '1m', '3m', '1y') → `resolution` + `from`/`to` (ISO-8601) 형식으로 변환하여 전송
 - **캐시 전략(권장)**: indices/news/movers는 Redis TTL 기반 캐시로 비용/지연 최소화
 - **지수 조회 주의사항**: Finnhub Quote API는 지수 심볼(`^DJI`, `^GSPC`, `^IXIC`)을 지원하지 않으므로, 해당 지수를 추적하는 ETF를 사용
 
@@ -592,17 +554,48 @@ GET https://eodhd.com/api/eod/MCD.US?api_token={API_KEY}&period=d&from=2017-01-0
 
 **참고**: 프론트엔드에서 이미 localStorage 기반 캐싱을 구현했으므로, 백엔드 Redis 캐싱은 추가적인 안정성 레이어로 작동합니다.
 
-- **DB 스키마 (Flyway V5)**:
-  - `stock_candles` 테이블: `symbol`, `date` (복합 PK), `open/high/low/close`, `volume`, `last_updated`
+- **DB 스키마 (Flyway V5, V8)**:
+  - `stock_candles` 테이블: `symbol`, `date`, `period` (복합 PK), `open/high/low/close`, `volume`, `last_updated`
+    - `period` 필드: `d` (daily), `w` (weekly), `m` (monthly) - V8 마이그레이션으로 추가
   - `api_usage_logs` 테이블: `provider`('EODHD'), `call_date`, `count`
 - **EODHD Client 구현**:
-  - `EodhdClient`: RestTemplate 기반, `getHistoricalData(symbol)` 메서드
-  - `QuotaManager`: 일일 호출 횟수 체크 및 DB 기록 로직
-- **StockService.getCandles() 개선**:
-  - Step 1: DB 조회
-  - Step 2: 데이터 최신성 체크 (오늘 장 종료 후 오늘 데이터 존재 여부)
-  - Step 3: Quota 체크 → EODHD 호출 또는 기존 데이터 반환
-  - Step 4: Quota 초과 시 Case A(기존 데이터 반환 + Stale 표시) 또는 Case B(429 에러)
+  - `EodhdClient`: RestTemplate 기반, `getHistoricalData(ticker, fromDate, toDate, period, order)` 메서드
+  - `warning` 필드 처리: 무료 구독 제한(최근 1년) 경고 메시지 필터링
+  - `QuotaManager`: 일일 호출 횟수 체크 및 DB 기록 로직 (일일 20회 제한)
+- **StockService.getCandles() 구현 완료**:
+  
+  **엔드포인트**: `GET /api/v1/stock/candles/{ticker}`
+  
+  **Request 파라미터**:
+  - `ticker` (path): 종목 심볼 (예: "AAPL")
+  - `resolution` (query): 시간 간격 (`d`=daily, `w`=weekly, `m`=monthly)
+  - `from` (query): 시작 시간 (ISO-8601 형식, 예: "2024-01-19T00:00:00Z")
+  - `to` (query): 종료 시간 (ISO-8601 형식, 예: "2026-01-19T23:59:59Z")
+  
+  **Response DTO**: `StockCandlesResponse`
+  - `ticker`: 종목 심볼
+  - `resolution`: 요청한 시간 간격
+  - `items`: 캔들 데이터 리스트 (`timestamp`, `open`, `high`, `low`, `close`, `volume`)
+  - `stale`: 데이터가 구식인지 여부 (Quota 초과 시 기존 데이터 반환 표시)
+  
+  **구현 상세**:
+  - ✅ Step 1: 날짜 범위 필터링 (from/to 파라미터를 LocalDate로 변환하여 DB 조회)
+  - ✅ Step 2: DB 조회 시 날짜 범위 필터링 (`findAllBySymbolAndPeriodAndDateBetweenOrderByDateAsc`)
+  - ✅ Step 3: 배치 로드 전략
+    - 전체 배치 로드: d 데이터가 없을 때 d, w, m 모두 한번에 가져오기 (Quota 1회만 카운트)
+    - 부분 배치 로드: d는 있지만 w, m 중 일부가 없을 때 누락된 것만 가져오기 (Quota 1회만 카운트)
+    - 개별 보완: 요청된 resolution만 개별적으로 가져오기
+  - ✅ Step 4: EODHD API 호출 시 날짜 범위 전달 (`getHistoricalData(ticker, fromDate, toDate, period, order)`)
+  - ✅ Step 5: DB 저장 시 날짜 범위 데이터만 저장 (UPSERT 전략, `period` 필드 포함)
+  - ✅ Step 6: 응답 데이터 필터링 (요청한 날짜 범위의 데이터만 반환)
+  - ✅ Step 7: 데이터 최신성 체크 (오늘 장 종료 후 오늘 데이터 존재 여부)
+  - ✅ Step 8: Quota 체크 → EODHD 호출 또는 기존 데이터 반환
+  - ✅ Step 9: Quota 초과 시 Case A(기존 데이터 반환 + `stale=true` 표시) 또는 Case B(429 에러)
+  
+  **⚠️ 주의사항**:
+  - **EODHD 무료 구독 제한**: 최근 1년 데이터만 제공. 1년 이전 날짜 범위 요청 시 `warning` 필드가 포함될 수 있음
+  - **경고 메시지 처리**: EODHD API 응답의 `warning` 필드는 필터링하여 유효한 캔들 데이터만 저장
+  - **티커 형식**: EODHD API는 `{SYMBOL}.{EXCHANGE_ID}` 형식 권장 (예: `AAPL.US`). 거래소 코드가 없으면 자동으로 `.US` 추가
 - **초기 구축 전략 (Seed Data)**:
   - 서버 시작 시점이 아니라, **"최초 요청 시"** 또는 **"관리자 트리거"**로 인기 종목(Top 10)만 우선 적재
   - 비인기 종목은 요청이 들어올 때 쿼터가 남으면 적재
@@ -1050,7 +1043,7 @@ sequenceDiagram
 
 ---
 
-**문서 버전:** 2.7.13 (Phase 6: Finnhub WebSocket 연동 완료)  
+**문서 버전:** 2.7.16 (Phase 6: Finnhub WebSocket + Phase 3.6/3.4 캐싱·Candles 범위 필터링 반영)  
 **최종 수정일:** 2026-01-19
 
 ---

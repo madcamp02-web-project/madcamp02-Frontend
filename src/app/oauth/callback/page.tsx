@@ -3,11 +3,12 @@
 import React, { useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuthStore } from "@/stores/auth-store";
+import { hasCompletedOnboarding } from "@/lib/utils";
 
 export default function OAuthCallbackPage() {
     const router = useRouter();
     const searchParams = useSearchParams();
-    const { checkAuth } = useAuthStore(); // We need to expose setAuth or use a specific action
+    const { checkAuth } = useAuthStore();
 
     useEffect(() => {
         // URL 파라미터에서 토큰 추출
@@ -42,23 +43,19 @@ export default function OAuthCallbackPage() {
 
         // auth-store 상태 업데이트 (토큰 설정)
         const authStore = useAuthStore.getState();
-        // Zustand store 상태 업데이트
-        useAuthStore.setState({ 
-            token: accessToken, 
+        useAuthStore.setState({
+            token: accessToken,
             isAuthenticated: true,
-            isLoading: true 
+            isLoading: true,
         });
 
-        // 사용자 정보 가져오기 (API 요청 시 Authorization 헤더에 토큰 자동 포함)
-        // checkAuth()는 localStorage에서 토큰을 읽어오므로 이미 설정된 토큰 사용
-        authStore.checkAuth()
+        // 사용자 정보 가져오기 후 온보딩 완료 여부/신규 여부를 함께 판단
+        authStore
+            .checkAuth()
             .then(() => {
-                // 신규 사용자는 온보딩 페이지로 리다이렉트
-                if (isNewUser) {
-                    router.push("/onboarding");
-                } else {
-                    router.push("/");
-                }
+                const state = useAuthStore.getState();
+                const needOnboarding = isNewUser || !hasCompletedOnboarding(state.user);
+                router.push(needOnboarding ? "/onboarding" : "/");
             })
             .catch((err) => {
                 console.error("Auth check failed:", err);

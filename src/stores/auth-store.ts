@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { User } from '@/types/user';
 import { authApi, LoginParams, SignupParams } from '@/lib/api/auth';
+import { hasCompletedOnboarding } from '@/lib/utils';
 
 interface AuthState {
     user: User | null;
@@ -65,9 +66,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     signup: async (params) => {
         set({ isLoading: true, error: null });
         try {
+            // 순수하게 회원 가입만 수행한다.
+            // 실제 로그인/온보딩 진입은 페이지 단에서 login/checkAuth/hasCompletedOnboarding으로 제어한다.
             await authApi.signup(params);
-            // Auto login after signup? Or require fresh login?
-            // For now, let's assume we redirect to login or auto-login.
         } catch (error: any) {
             set({ error: error.response?.data?.message || 'Signup failed' });
             throw error;
@@ -88,7 +89,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
                 }
                 set({ token, isAuthenticated: true });
                 await get().checkAuth();
-                // isNewUser 반환
+                // isNewUser는 그대로 반환하되, 실제 온보딩 필요 여부는
+                // 호출 측에서 hasCompletedOnboarding(user)와 함께 판단한다.
                 return data.isNewUser === true;
             }
             return false;
@@ -112,7 +114,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
                 }
                 set({ token, isAuthenticated: true });
                 await get().checkAuth();
-                // isNewUser 반환
+                // isNewUser는 그대로 반환하되, 실제 온보딩 필요 여부는
+                // 호출 측에서 hasCompletedOnboarding(user)와 함께 판단한다.
                 return data.isNewUser === true;
             }
             return false;

@@ -1,6 +1,6 @@
 # 📁 MadCamp02: 최종 통합 명세서
 
-**Ver 2.7.14 - Complete Edition (Spec-Driven Alignment)**
+**Ver 2.7.17 - Complete Edition (Spec-Driven Alignment)**
 
 ---
 
@@ -31,6 +31,9 @@
 | **2.7.12** | **2026-01-19** | **Phase 5.5 실행: `/api/v1/game/*` 응답 DTO/에러 코드(GAME_001~003)·items.category CHECK 제약·랭킹 필터(is_ranking_joined) 구현 상태를 스펙과 최종 정합화** | **MadCamp02** |
 | **2.7.13** | **2026-01-19** | **Phase 6: 실시간 통신(10장) 추가 - STOMP 토픽/payload 스키마, Finnhub WebSocket 제약사항, ticker destination 안전성 정책 고정 (FinnhubTradesWebSocketClient/TradePriceBroadcastService/StompDestinationUtils 기준)** | **MadCamp02** |
 | **2.7.14** | **2026-01-19** | **Phase 3.6: 백엔드 Redis 캐싱 확장 (Market Indices/News/Movers) 및 프론트엔드 이중 캐싱 전략 수립** | **MadCamp02** |
+| **2.7.15** | **2026-01-19** | **5.3.1: Candles API 상세 명세 보강 (Request/Response DTO, 날짜 범위 필터링, period 필드, 배치 로드 전략 상세 설명 추가)** | **MadCamp02** |
+| **2.7.16** | **2026-01-19** | **Candles API 범위 필터링/배치 로드/Quota 처리 최종 고정 + 문서 하단 버전 정합성 수정(Phase 3.4/3.6 반영)** | **MadCamp02** |
+| **2.7.17** | **2026-01-20** | **Kakao OAuth 스코프를 `profile_nickname` 단일로 축소, 이메일 미동의 시 백엔드가 임의 이메일(`kakao-{timestamp}-{random}@auth.madcamp02.local`)을 생성·중복 검사 후 가입하도록 명시. 소셜 신규 로그인은 `isNewUser` 플래그를 통해 `/onboarding` 리다이렉트하도록 가이드(구글/카카오 공통).** | **MadCamp02** |
 
 ### Ver 2.6 주요 변경 사항
 
@@ -524,22 +527,79 @@ _(나머지 테이블 `wallet`, `portfolio`, `trade_logs`, `inventory`, `watchli
 
 #### 5.3.1 Historical Data (Candles) API 동작 방식
 
+**엔드포인트**: `GET /api/v1/stock/candles/{ticker}`
+
+**Request 파라미터**:
+- `ticker` (path, required): 종목 심볼 (예: "AAPL")
+- `resolution` (query, required): 시간 간격 (`d`=daily, `w`=weekly, `m`=monthly)
+- `from` (query, required): 시작 시간 (ISO-8601 형식, 예: "2024-01-19T00:00:00Z")
+- `to` (query, required): 종료 시간 (ISO-8601 형식, 예: "2026-01-19T23:59:59Z")
+
+**Response DTO**:
+```json
+{
+  "ticker": "AAPL",
+  "resolution": "d",
+  "items": [
+    {
+      "timestamp": 1705612800,
+      "open": 195.12,
+      "high": 196.50,
+      "low": 194.80,
+      "close": 195.50,
+      "volume": 50000000
+    }
+  ],
+  "stale": false
+}
+```
+
+**필드 설명**:
+- `ticker`: 종목 심볼
+- `resolution`: 요청한 시간 간격 (`d`, `w`, `m`)
+- `items`: 캔들 데이터 리스트 (요청한 날짜 범위(`from` ~ `to`) 내의 데이터만 포함)
+  - `timestamp`: UNIX timestamp (초 단위)
+  - `open`, `high`, `low`, `close`: OHLC 가격 데이터
+  - `volume`: 거래량
+- `stale`: 데이터가 구식인지 여부 (Quota 초과 시 기존 데이터 반환 표시, 기본값: `false`)
+
 **데이터 전략**: EODHD API + DB 캐싱 기반 (`docs/DATA_STRATEGY_PLAN.md` 참조)
 
+**날짜 범위 필터링**:
+- 프론트엔드에서 받은 `from`/`to` 파라미터를 `LocalDate`로 변환하여 DB 조회 시 날짜 범위 필터링 적용
+- DB 조회: `findAllBySymbolAndPeriodAndDateBetweenOrderByDateAsc(ticker, period, fromDate, toDate)`
+- EODHD API 호출 시에도 동일한 날짜 범위 전달
+- 응답의 `items` 배열에는 정확히 요청한 날짜 범위(`from` ~ `to`) 내의 데이터만 포함
+
+**`period` 필드**:
+- `stock_candles` 테이블에 `period` 필드 추가 (V8 마이그레이션)
+- `period` 값: `d` (daily), `w` (weekly), `m` (monthly)
+- 복합 Primary Key: `(symbol, date, period)`
+- 같은 종목, 같은 날짜라도 `period`가 다르면 별도 레코드로 저장
+
+**배치 로드 전략**:
+1. **전체 배치 로드**: d 데이터가 없을 때 d, w, m 모두 한번에 가져오기 (Quota 1회만 카운트)
+2. **부분 배치 로드**: d는 있지만 w, m 중 일부가 없을 때 누락된 것만 가져오기 (Quota 1회만 카운트)
+3. **개별 보완**: 요청된 resolution만 개별적으로 가져오기 (w 또는 m만 필요한 경우)
+
 **동작 흐름**:
-1. **DB 조회 우선**: `stock_candles` 테이블에서 해당 종목 데이터 조회
-2. **최신성 체크**: 오늘 장 종료 후 오늘 데이터 존재 여부 확인
-3. **Quota 체크**: `api_usage_logs` 테이블에서 오늘 EODHD 호출 횟수 확인 (일일 20회 제한)
-4. **분기 처리**:
+1. **날짜 변환**: `from`/`to` 파라미터를 `LocalDate`로 변환
+2. **배치 로드 체크**: d 데이터가 없으면 전체 배치 로드, w/m이 일부 없으면 부분 배치 로드
+3. **DB 조회**: 요청한 `period`와 날짜 범위로 DB 조회
+4. **개별 보완**: 요청된 resolution이 없으면 개별 보완 (w 또는 m만)
+5. **최신성 체크**: 오늘 장 종료 후 오늘 데이터 존재 여부 확인
+6. **Quota 체크**: `api_usage_logs` 테이블에서 오늘 EODHD 호출 횟수 확인 (일일 20회 제한)
+7. **분기 처리**:
    - **데이터 최신**: DB 데이터 반환 (API 호출 없음)
-   - **데이터 구식 + Quota 여유**: EODHD 호출 → DB 저장 → 데이터 반환
-   - **Quota 초과 + 기존 데이터 있음**: DB 데이터 반환 + `X-Data-Status: Stale` 헤더 또는 `warning` 필드 포함
+   - **데이터 구식 + Quota 여유**: EODHD 호출 → DB 저장 (UPSERT 전략) → 데이터 반환
+   - **Quota 초과 + 기존 데이터 있음**: DB 데이터 반환 + `stale: true` 표시
    - **Quota 초과 + 기존 데이터 없음**: `429 Too Many Requests` 에러 반환
 
 **⚠️ 주의사항**:
 - **무료 구독 제한**: EODHD 무료 플랜은 **최근 1년 데이터만 제공**합니다.
   - 1년 이전 날짜 범위 요청 시 `{"warning":"Data is limited by one year as you have free subscription"}` 경고 메시지가 반환될 수 있습니다.
   - 실제 캔들 데이터 없이 경고만 반환되는 경우, 응답에서 `warning` 필드를 체크하여 필터링해야 합니다.
+  - 백엔드 `EodhdClient`에서 `warning` 필드가 있는 응답은 자동으로 필터링하여 유효한 캔들 데이터만 저장합니다.
 - **티커 형식**: EODHD API는 `{SYMBOL}.{EXCHANGE_ID}` 형식을 권장합니다 (예: `AAPL.US`). 거래소 코드가 없으면 백엔드에서 자동으로 `.US`를 추가합니다.
 
 **초기 구축 전략 (Seed Data)**:
@@ -948,12 +1008,14 @@ MadCamp02는 유연한 연동을 위해 두 가지 인증 흐름을 모두 제�
 3.  **토큰 전달**: 백엔드가 프론트엔드의 `/oauth/callback`으로 리다이렉트하며 Query Parameter로 토큰 전달. _(프론트 라우트 구현: Phase 1)_
     - 예: `http://localhost:3000/oauth/callback?accessToken=...&isNewUser=true`
 4.  **세션 저장**: 프론트엔드에서 토큰 추출 후 스토리지 저장 및 `auth-store` 업데이트.
+5.  **Kakao 동의 스코프**: `profile_nickname` **단일 필수**로 요청한다. `account_email`은 요청하지 않으며, Kakao 응답에 이메일이 없을 경우 백엔드가 `kakao-{timestamp}-{random}@auth.madcamp02.local` 형식의 임의 이메일을 생성해 중복 검사 후 가입시킨다.
 
 #### B. Frontend-Driven (Mobile/SPA)
 
 1.  **토큰 획득**: 프론트엔드(앱)에서 카카오 SDK 등을 통해 Access Token 직접 획득.
 2.  **로그인 요청**: 프론트엔드가 `POST /api/v1/auth/oauth/kakao` 호출 (Body: `{ "accessToken": "..." }`).
 3.  **토큰 발급**: 백엔드 검증 후 JWT 응답.
+4.  **신규 가입 판단**: 백엔드 응답 `isNewUser == true`이면 프론트가 즉시 `/onboarding`으로 리다이렉트하여 `birthDate/birthTime/gender/calendarType/nickname`을 확정 입력한다(구글/카카오 공통).
 
 ---
 
@@ -1479,5 +1541,5 @@ CREATE TABLE api_usage_logs (
 
 ---
 
-**문서 버전:** 2.7.13 (Phase 6: 실시간 통신 스펙 추가 및 Finnhub WebSocket 제약사항 정합화)  
+**문서 버전:** 2.7.16 (Phase 6 + Candles/Redis 캐싱 정합성 반영)  
 **최종 수정일:** 2026-01-19
