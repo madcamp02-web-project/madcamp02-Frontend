@@ -6,6 +6,7 @@ import { hasCompletedOnboarding } from '@/lib/utils';
 interface AuthState {
     user: User | null;
     token: string | null;
+    refreshToken: string | null;
     isAuthenticated: boolean;
     isLoading: boolean;
     error: string | null;
@@ -23,6 +24,7 @@ interface AuthState {
 export const useAuthStore = create<AuthState>((set, get) => ({
     user: null,
     token: typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null,
+    refreshToken: typeof window !== 'undefined' ? localStorage.getItem('refreshToken') : null,
     isAuthenticated: false,
     isLoading: true,
     error: null,
@@ -41,7 +43,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
                 if (data.refreshToken) {
                     localStorage.setItem('refreshToken', data.refreshToken);
                 }
-                set({ token, isAuthenticated: true });
+                set({
+                    token,
+                    refreshToken: data.refreshToken ?? null,
+                    isAuthenticated: true,
+                });
                 
                 // checkAuth는 실패해도 로그인은 유지 (토큰이 있으면 인증된 것으로 간주)
                 try {
@@ -87,7 +93,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
                 if (data.refreshToken) {
                     localStorage.setItem('refreshToken', data.refreshToken);
                 }
-                set({ token, isAuthenticated: true });
+                set({
+                    token,
+                    refreshToken: data.refreshToken ?? null,
+                    isAuthenticated: true,
+                });
                 await get().checkAuth();
                 // isNewUser는 그대로 반환하되, 실제 온보딩 필요 여부는
                 // 호출 측에서 hasCompletedOnboarding(user)와 함께 판단한다.
@@ -112,7 +122,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
                 if (data.refreshToken) {
                     localStorage.setItem('refreshToken', data.refreshToken);
                 }
-                set({ token, isAuthenticated: true });
+                set({
+                    token,
+                    refreshToken: data.refreshToken ?? null,
+                    isAuthenticated: true,
+                });
                 await get().checkAuth();
                 // isNewUser는 그대로 반환하되, 실제 온보딩 필요 여부는
                 // 호출 측에서 hasCompletedOnboarding(user)와 함께 판단한다.
@@ -171,9 +185,24 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
         try {
             console.log('[AuthStore] checkAuth: 사용자 정보 조회 시작');
-            const userData = await authApi.me();
-            console.log('[AuthStore] checkAuth: 사용자 정보 조회 성공:', userData);
-            set({ user: userData, isAuthenticated: true, isLoading: false });
+            const raw = await authApi.me();
+            console.log('[AuthStore] checkAuth: 사용자 정보 조회 성공:', raw);
+
+            // 백엔드 AuthResponse → 프론트 User 타입으로 매핑
+            const mappedUser: User = {
+            id: String(raw.userId),
+            email: raw.email,
+            nickname: raw.nickname,
+            provider: raw.provider ?? 'EMAIL',
+            profileImage: raw.avatarUrl ?? undefined,
+            // 온보딩 완료 여부 판단에 쓰는 핵심 필드들
+            birthDate: raw.birthDate ?? undefined,
+            sajuElement: raw.sajuElement ?? undefined,
+            // 필요하면 나중에 /me 응답에 추가한 뒤 같이 실어 쓰면 됨
+            zodiacSign: raw.zodiacSign ?? undefined,
+            };
+
+            set({ user: mappedUser, isAuthenticated: true, isLoading: false });
             
             // 인증 성공 시 user-store의 데이터 자동 로드
             if (typeof window !== 'undefined') {
@@ -211,6 +240,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     logout: () => {
         localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');
-        set({ user: null, token: null, isAuthenticated: false, isLoading: false });
+        set({ user: null, token: null, refreshToken: null, isAuthenticated: false, isLoading: false });
     },
 }));

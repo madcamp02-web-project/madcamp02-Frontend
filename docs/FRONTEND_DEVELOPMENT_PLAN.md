@@ -1,6 +1,6 @@
 # 🎨 MadCamp02: 프론트엔드 개발 계획서
 
-**Ver 2.7.16 - Frontend Development Blueprint (Spec-Driven Alignment)**
+**Ver 2.7.21 - Frontend Development Blueprint (Spec-Driven Alignment)**
 
 ---
 
@@ -27,6 +27,10 @@
 | **2.7.13** | **2026-01-19** | **Phase 3.6: 백엔드 Redis 캐싱 확장 및 프론트엔드 이중 캐싱 전략 수립 (X-Cache-Status 헤더 처리)** | **MadCamp02** |
 | **2.7.15** | **2026-01-20** | **실 구현 현황 최신화: 모든 주요 라우트/스토어가 실제 REST API 및 `/ws-stomp` 클라이언트와 연결됨을 반영, 온보딩 필드·OAuth 콜백·캐시 헤더 처리 정합성 수정** | **MadCamp02** |
 | **2.7.16** | **2026-01-20** | **Kakao 동의 스코프를 `profile_nickname` 단일로 축소하고, 이메일은 백엔드가 임의 생성하도록 가이드. OAuth 콜백에서 `isNewUser`면 `/onboarding`으로 즉시 리다이렉트하도록 최초 로그인 플로우 명시(구글/카카오 공통).** | **MadCamp02** |
+| **2.7.17** | **2026-01-20** | **마이페이지에서 생년월일/시간/성별/달력 타입/닉네임을 수정 후 `POST /api/v1/user/onboarding`을 호출해 사주를 재계산하는 재온보딩 플로우를 명시하고, 온보딩 페이지와 동일 DTO/스토어 동기화 규칙으로 통일.** | **MadCamp02** |
+| **2.7.18** | **2026-01-20** | **일반 회원가입 성공 시 자동 로그인 후 `/onboarding`으로 직행하도록 플로우를 고정하고, `hasCompletedOnboarding(user)`(= `birthDate + sajuElement`) 기반 온보딩 강제/라우팅 규칙 및 Investment Style의 프론트 전용 필드 성격을 문서화.** | **MadCamp02** |
+| **2.7.19** | **2026-01-21** | **계산기(`/calculator`) 페이지의 Calc API 연동(배당/세금 계산 1차 버전) 및 환율 조회 API(`/api/v1/exchange-rates`) 활용 계획, 다통화(currency) 확장 Future work를 문서에 반영.** | **MadCamp02** |
+| **2.7.21** | **2026-01-21** | **현재 프론트 구현/연동 완료 상태를 단일 Snapshot 섹션으로 정리하고, `FRONTEND_API_WIRING`과 본 계획서/통합 명세서 간 불일치 표현을 제거(“완료/미완료” 구분 고정).** | **MadCamp02** |
 
 ### Ver 2.6 주요 변경 사항
 
@@ -68,6 +72,54 @@
 2.  **Historical Data API 동작**: EODHD + DB 캐싱 기반. Quota 초과 시 기존 데이터(Stale) 반환 또는 429 에러 처리.
 3.  **WebSocket 구독 관리**: 백엔드 LRU 기반 동적 구독 관리 전략 명시. 프론트는 페이지 이탈 시 명시적 구독 해제 권장.
 4.  **에러 처리 가이드**: `429 QUOTA_EXCEEDED` 에러 시 사용자 안내 메시지 표시, `X-Data-Status: Stale` 헤더 감지 시 UI 표시.
+
+---
+
+## ✅ 현재까지 프론트 구현/연동 완료 요약 (Snapshot)
+
+> 단일 진실(계약/연동 상세): `docs/FRONTEND_API_WIRING.md`  
+> 본 섹션은 “현재 실제 코드가 연결된 상태”만 요약해 고정합니다.
+
+### 1) 라우트/레이아웃
+
+- **완료**: `/`, `/market`, `/trade`, `/portfolio`, `/shop`, `/ranking`, `/oracle`, `/mypage`, `/login`, `/signup`, `/oauth/callback`, `/onboarding`, `/calculator`
+- **정리 규칙**: `/gacha`는 `/shop`으로 리다이렉트(라우팅 혼선 방지)
+
+### 2) 인증/온보딩 (강제 플로우 포함)
+
+- **완료**
+  - 이메일 로그인/회원가입 → 자동 로그인 → `hasCompletedOnboarding(user)` 기준 온보딩 강제
+  - 소셜 로그인: Backend-Driven Redirect + Frontend-Driven Token API 모두 지원
+  - `/oauth/callback`에서 토큰 저장 → `checkAuth()` → 신규/미완료면 `/onboarding`
+  - `AuthGuard`가 메인 영역 접근 전 온보딩 강제
+
+### 3) API 레이어
+
+- **완료**
+  - `src/lib/api/index.ts`에서 토큰 주입, 401 시 refresh 후 1회 retry
+  - `/api/v1/market/**` 응답 헤더(`X-Cache-Status|Age|Freshness`) 파싱 및 UI 노출 메타 저장
+  - 에러 파싱 유틸(`src/lib/api/error.ts`)로 표준화
+
+### 4) 페이지별 실데이터 연동
+
+- **완료**
+  - `/market`: indices/news/movers 실데이터 + 캐시 배지/STALE 안내
+  - `/trade`: search/quote/candles/orderbook + 주문 + 체결 알림(STOMP) 후 재조회
+  - `/portfolio`: portfolio/history/available-balance 연동
+  - `/shop`/`/ranking`/`/mypage`: game/user API 연동(카테고리 규약 `NAMEPLATE|AVATAR|THEME`)
+  - `/calculator`: Calc API(배당/세금) 1차 버전 연동(USD 기준, currency=null)
+
+### 5) 실시간(STOMP)
+
+- **완료**
+  - `/ws-stomp` 연결 및 `/topic/stock.indices`, `/topic/stock.ticker.{ticker}`, `/user/queue/trade` 구독 흐름 사용 가능
+- **후속(선택)**
+  - UI 폴리싱/구독 최적화(페이지 이탈 시 unsubscribe 명시 등)
+
+### 6) 미완료/후속
+
+- **SSE 기반 AI 스트리밍**: 현재는 HTTP 기반 호출 중심이며, SSE 스트리밍 UX/파싱/통합은 후속
+- **다통화(Calc)**: FX API 기반 통화 선택/환율 표시 및 Calc 응답의 `currency/fxAsOf/fxRateUsed` 확장은 Future work
 
 ---
 
@@ -231,8 +283,8 @@ src/
 - **랭킹 `/ranking`**: `gameApi.getRanking` 호출로 Top 리스트/내 랭킹 로딩. `user-store`의 `isRankingJoined` 상태와 연계.
 - **마이페이지 `/mypage`**: 프로필/인벤토리/지갑/랭킹 참여 토글 모두 `userApi`/`gameApi` 실 호출로 동작. 공개/랭킹참여 토글은 `userApi.updateProfile`을 통해 서버 반영.
 - **AI 도사 `/oracle`**: `lib/api/ai.ts`가 FastAPI(`http://localhost:8000`)에 POST 호출하여 응답을 받음. SSE 스트리밍은 아직 미구현.
-- **온보딩 `/onboarding`**: UI가 `nickname/birthDate/birthTime/gender/calendarType` 필드 모두 입력 받고 `userApi.submitOnboarding`(POST `/api/v1/user/onboarding`)을 호출. 응답의 `saju` 필드 기반 결과 표시(없으면 기본값).
-- **계산기 `/calculator`**: 페이지는 존재하나 안내 문구만 표시(기능 미구현).
+- **온보딩 `/onboarding`**: UI가 `nickname/birthDate/birthTime/gender/calendarType` 필드 모두 입력 받고 `userApi.submitOnboarding`(POST `/api/v1/user/onboarding`)을 호출. 응답의 `saju` 필드 기반 결과 표시(없으면 기본값). 마이페이지에서 동일 DTO를 사용해 재온보딩(사주 재계산)도 수행한다.
+- **계산기 `/calculator`**: 배당/세금 계산 폼을 표시하고, 사용자가 입력한 배당 수익률/주당 배당액/세율을 `calcApi.getDividend/getTax`를 통해 백엔드 Calc API와 연동한다. Currency는 현재 `null`로 내려오며, 화면에서는 USD 기준 값으로만 표시한다.
 - **인증**:
   - `/login`: 이메일 로그인은 `authApi.login` 호출 후 토큰 저장·`checkAuth` 실행. Kakao/Google은 SDK 기반 Frontend-Driven + Redirect Fallback 모두 지원. Refresh는 Axios 인터셉터(`/api/v1/auth/refresh`)로 재시도.
   - `/signup`: `authApi.signup` 연동, 폼 검증 후 성공 시 `/login`으로 안내.
@@ -249,6 +301,7 @@ src/
   - **Email Login**: `POST /api/v1/auth/login` (일반 로그인)
 - **회원가입 (`/signup`)**: 이메일, 비밀번호, 닉네임 입력.
   - API: `POST /api/v1/auth/signup`
+  - 회원가입 성공 시에는 기존처럼 단순히 `/login`으로 보내지 않고, **동일 자격증명으로 `POST /api/v1/auth/login`을 한 번 더 호출해 토큰을 저장·`checkAuth()`를 수행한 뒤, 온보딩 미완료 상태이면 `/onboarding`으로 바로 이동**하는 것이 목표 플로우이다.
 - **OAuth 콜백 (`/oauth/callback`)**: URL 쿼리 파라미터(`accessToken`, `refreshToken`) 파싱 및 저장.
 - **온보딩 (`/onboarding`)**: 정밀 사주 계산을 위한 정보 입력 → 사주(오행) 계산 및 프로필 생성.
   - API: `POST /api/v1/user/onboarding`
@@ -260,6 +313,22 @@ src/
   - **최초 로그인 라우팅 규칙**:
     - `AuthResponse.isNewUser == true` → `/onboarding`으로 즉시 리다이렉트(구글/카카오 공통).
     - Kakao: 동의 항목은 `profile_nickname`만 필수로 요청, 이메일은 백엔드가 임의(`kakao-{timestamp}-{random}@auth.madcamp02.local`) 생성하므로 SDK에서 이메일 스코프를 요청하지 않는다.
+
+#### 5.1.1 온보딩 완료 판단 및 라우팅 규칙
+
+- **온보딩 완료 유틸 `hasCompletedOnboarding(user)`**
+  - 프론트에서는 `/api/v1/auth/me` 또는 `/api/v1/user/me`에서 내려오는 `User` 타입을 기준으로, 다음과 같이 온보딩 완료 여부를 계산하는 유틸을 사용한다.
+  - 구현 예시: `hasCompletedOnboarding(user) = !!user?.birthDate && !!user?.sajuElement;`
+- **라우팅 규칙(일반/소셜 공통)**
+  - 일반 회원가입:
+    - `/signup` → `authApi.signup` 성공 → 동일 자격증명으로 `authApi.login` → `checkAuth()` 수행 후, `!hasCompletedOnboarding(user)`이면 `/onboarding`, 그렇지 않으면 `/`로 이동.
+  - 소셜 로그인(`loginWithKakao`, `loginWithGoogle`, `/oauth/callback`):
+    - 백엔드 응답의 `isNewUser` 플래그와 `/me` 기반 `hasCompletedOnboarding(user)`를 함께 사용해 `const needOnboarding = isNewUser === true || !hasCompletedOnboarding(user);`로 판단한다.
+    - `needOnboarding`이 true이면 `/onboarding`, false이면 `/`로 라우팅한다.
+  - (main) 레이아웃 상단의 `AuthGuard`는 인증이 되어 있고 `hasCompletedOnboarding(user) === false`이며 현재 경로가 `/onboarding`이 아닌 경우 항상 `/onboarding`으로 `router.replace`하여, 온보딩 완료 전에는 대시보드/거래/마이페이지 등 메인 기능에 진입할 수 없도록 보호한다.
+- **Investment Style 필드의 역할**
+  - 온보딩 두 번째 스텝의 Investment Style(투자 성향) 선택 값은 **프론트엔드 UX 전용 필드**이며, `/api/v1/user/onboarding` 요청 Body에는 포함되지 않는다.
+  - 백엔드 온보딩 API는 `nickname/birthDate/birthTime/gender/calendarType`만 사용해 사주를 계산하고 `users` 테이블을 갱신하며, Investment Style은 온보딩 결과 카드의 추천 문구나 향후 AI 프롬프트에 활용하는 용도로만 사용한다.
 
 ### 5.2 대시보드 (`/`)
 
@@ -438,12 +507,50 @@ interface TradeHistoryResponse {
   - API: `PUT /api/v1/user/me`
 - **인벤토리**: 획득한 아이템 조회 및 장착/해제.
   - API: `GET /api/v1/game/inventory`, `PUT /api/v1/game/equip/{itemId}`
+- **사주 정보 수정 및 재계산(재온보딩)**:
+  - UI:
+    - 입력 필드: `birthDate`(생년월일), `birthTime`(생시, 선택), `gender`(MALE/FEMALE/OTHER), `calendarType`(SOLAR/LUNAR/LUNAR_LEAP), `nickname`.
+    - 현재 사주 요약: `sajuElement`(오행), `zodiacSign`(띠)를 읽기 전용으로 표시하고, **재계산 시 값이 변경될 수 있음을 안내하는 텍스트**를 함께 보여준다.
+    - 사주 섹션 상단 안내문 예시:  
+      > "사주 정보(생년월일/시간/성별/달력)는 AI 조언과 캐릭터 컨셉에 영향을 주며, 변경 시 전체 경험이 달라질 수 있습니다. 신중하게 수정해주세요."
+  - 동작 플로우:
+    1. 마이페이지 진입 시 `user-store.fetchProfile()`로 `User` 타입의 `birthDate/birthTime/gender/calendarType/sajuElement/zodiacSign`을 로컬 상태에 동기화한다.
+    2. 사용자가 필드를 수정한 뒤 **사주 다시 계산하기** 버튼을 클릭하면, 필수값(`birthDate`, `gender`, `calendarType`, `nickname`)을 검증한다.
+    3. 검증을 통과하면 `window.confirm("정말로 사주를 다시 계산하시겠습니까?")` 모달로 재확인을 받고, 확인 시 `userApi.submitOnboarding({ nickname, birthDate, birthTime, gender, calendarType })`를 호출한다.
+    4. 호출이 성공하면 `auth-store.checkAuth()` 또는 `user-store.fetchProfile()`을 호출해 `/api/v1/user/me` 기반 전역 상태(`auth-store.user` 및 `user-store.profile/wallet/items`)를 다시 로딩한다.
+    5. 성공 시 "사주 정보가 다시 계산되었습니다" 토스트/알림을 표시하고, 에러 시 온보딩 페이지와 동일 패턴으로 오류 메시지를 표기한다.
+  - API: `POST /api/v1/user/onboarding` (온보딩/재온보딩 공통 DTO 사용, idempotent 재계산)
 
 ### 5.8 AI 도사 (`/oracle`) 🆕
 
 - **채팅 UI**: 사용자와 AI 간 대화창.
 - **스트리밍 답변**: SSE를 통해 실시간으로 답변 생성되는 과정 표시.
   - API: `POST /api/v1/chat/ask` (백엔드 프록시, SSE 스트리밍)
+
+### 5.9 계산기 (`/calculator`) 🆕
+
+- **상태**: 라우트/레이아웃 및 백엔드 Calc API는 존재하며, 1차 버전 배당/세금 계산 로직이 구현된 상태 (다통화는 미구현).
+- **목표**: 기본적인 배당/세금 계산기를 제공하되, 복잡한 세법 구현보다는 UX/학습용 계산에 집중. 향후 환율/다통화 지원까지 확장.
+- **현재 연동(1차 버전)**:
+  - 백엔드 Calc API:
+    - `GET /api/v1/calc/dividend?assumedDividendYield&dividendPerShare&taxRate`
+      - `assumedDividendYield`: 배당 수익률(0.03 = 3%), 지갑 총자산 기준 `totalDividend` 계산.
+      - `dividendPerShare`: 주당 배당액 (현재 버전에서는 사용하지 않지만, UI 입력 필드로는 확보).
+      - `taxRate`: 배당소득세 세율.
+    - `GET /api/v1/calc/tax?taxRate`
+      - `taxRate`: 양도소득세 세율.
+  - 응답 DTO:
+    - `CalcDividendResponse { totalDividend, withholdingTax, netDividend, currency(null) }`
+    - `CalcTaxResponse { realizedProfit, taxBase, estimatedTax, currency(null) }`
+  - Frontend 사용 예:
+    - `calcApi.getDividend({ assumedDividendYield, dividendPerShare, taxRate })`
+    - `calcApi.getTax({ taxRate })`
+- **환율/다통화 확장 계획(요약)**:
+  - 백엔드에서 `exchange_rates` 테이블과 `/api/v1/exchange-rates`, `/api/v1/exchange-rates/latest` API를 통해 환율을 제공.
+  - 추후 Calc API에 `currency` 쿼리 파라미터를 추가(`USD`, `KRW`, `EUR` 등)하고,
+    - USD 기준 계산 결과를 환율 테이블 기준으로 변환해 응답(`currency`, `fxAsOf`, `fxRateUsed`)을 채우는 것을 목표로 한다.
+  - 프론트 `/calculator` 페이지에는 통화 선택 드롭다운을 추가하고,
+    - 선택된 통화와 환율(`exchange-rates` API 응답)을 기반으로 금액 표시 포맷과 기준일(`fxAsOf`)을 함께 노출하는 UX를 설계한다.
 
 ---
 
@@ -664,8 +771,8 @@ flowchart TD
 
 ---
 
-**문서 버전:** 2.7.11 (Phase 5 완료 + Phase 5.5 프론트 연동·DB 제약 보강 체크리스트 반영)  
-**최종 수정일:** 2026-01-19
+**문서 버전:** 2.7.18 (온보딩/마이페이지 사주 재계산 플로우, `/user/onboarding` 재온보딩 연동 및 hasCompletedOnboarding 기반 필수 온보딩 플로우 반영)  
+**최종 수정일:** 2026-01-20
 
 ### 수정 요약 (2026-01-19)
 

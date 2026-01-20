@@ -45,9 +45,9 @@ export const authApi = {
         return data;
     },
 
-    // Check Auth (Me)
+    // Check Auth (Me) - 인증 컨텍스트 전용
     me: async () => {
-        const { data } = await api.get('/api/v1/user/me');
+        const { data } = await api.get('/api/v1/auth/me');
         return data;
     }
 };

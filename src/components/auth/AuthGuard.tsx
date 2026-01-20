@@ -27,7 +27,9 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
         }
     }, [mounted, isLoading, isAuthenticated, router]);
 
-    // 3차: 온보딩 미완료 사용자는 메인 레이아웃에서 항상 /onboarding으로 강제
+    // 3차:
+    // - 온보딩 미완료 사용자는 메인 레이아웃에서 항상 /onboarding 으로 강제
+    // - 온보딩이 이미 완료된 사용자는 /onboarding 으로 다시 진입할 수 없도록 / 로 리다이렉트
     useEffect(() => {
         if (!mounted || isLoading) return;
         if (!isAuthenticated) return;
@@ -37,6 +39,13 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
         if (needOnboarding && pathname !== "/onboarding") {
             console.log("AUTH GUARD: Redirecting to /onboarding (onboarding not completed)");
             router.replace("/onboarding");
+            return;
+        }
+
+        // 온보딩이 이미 완료된 계정은 /onboarding 으로 다시 올 수 없도록 막는다.
+        if (!needOnboarding && pathname === "/onboarding") {
+            console.log("AUTH GUARD: Onboarding already completed, redirecting to /");
+            router.replace("/");
         }
     }, [mounted, isLoading, isAuthenticated, user, pathname, router]);
 

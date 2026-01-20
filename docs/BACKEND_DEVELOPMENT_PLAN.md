@@ -1,6 +1,6 @@
 # ⚙️ MadCamp02: 백엔드 개발 계획서
 
-**Ver 2.7.17 - Backend Development Blueprint (Spec-Driven Alignment)**
+**Ver 2.7.21 - Backend Development Blueprint (Spec-Driven Alignment)**
 
 ---
 
@@ -34,6 +34,10 @@
 | **2.7.15** | **2026-01-19** | **Phase 3.6: 백엔드 Redis 캐싱 확장 (Market Indices/News/Movers) 및 프론트엔드 이중 캐싱 전략 수립** | **MadCamp02** |
 | **2.7.16** | **2026-01-19** | **Phase 3.4: Candles API 날짜 범위 필터링 구현 완료 내용 문서화 (period 필드, 배치 로드 전략, Quota 관리 상세 명세 추가)** | **MadCamp02** |
 | **2.7.17** | **2026-01-20** | **Kakao 동의 스코프를 `profile_nickname` 단일로 축소, 이메일 미요청 시 백엔드가 임의 이메일(`kakao-{timestamp}-{random}@auth.madcamp02.local`)을 생성·중복 검사 후 가입하도록 프로비저닝 로직 보강(하이브리드 OAuth 공통)** | **MadCamp02** |
+| **2.7.18** | **2026-01-20** | **`POST /api/v1/user/onboarding`가 최초 온보딩과 마이페이지 사주 정보 수정 시 재계산(재온보딩)을 모두 처리하는 idempotent 엔드포인트임을 명시하고, 재온보딩 시 `users.*` 사주 관련 컬럼을 안전하게 덮어쓰도록 정책을 고정. 온보딩 완료 여부는 별도 플래그 없이 `users.birth_date + users.saju_element` 조합으로 해석함을 명시.** | **MadCamp02** |
+| **2.7.19** | **2026-01-21** | **환율 테이블(`exchange_rates`) 및 한국수출입은행 Open API 기반 환율 수집 배치/조회 API(`/api/v1/exchange-rates`) 설계·구현 현황과 Calc API(배당/세금 계산) 1차 버전 쿼리 파라미터/응답 규약을 문서에 반영. 온보딩 전용 에러 코드(ONBOARDING_001~003)와 `User.hasCompletedOnboarding()` 헬퍼 도입을 계획서에 기록.** | **MadCamp02** |
+| **2.7.20** | **2026-01-21** | **`GET /api/v1/auth/me` 응답에 `birthDate` 필드를 포함하도록 `AuthResponse`·`AuthController.me`·`AuthService`를 정리하고, `User.hasCompletedOnboarding()` 기준(`birthDate + sajuElement`)에 맞춰 온보딩 강제 플로우(백엔드/프론트 `hasCompletedOnboarding(user)`/AuthGuard)가 실제 구현과 정합하게 동작함을 확인. 개발/테스트 계정 더미 데이터(`V7__insert_test_data.sql`)의 비밀번호를 공통 값(평문 `Password123!`)으로 통일하고 주석으로 명시하여 로그인 시나리오를 문서화.** | **MadCamp02** |
+| **2.7.21** | **2026-01-21** | **프론트 연동 문서(`FRONTEND_API_WIRING`)와 3대 스펙 문서(Backend/Frontend Plan, Full Spec)의 “현재까지 완료된 구현/연동”을 단일 요약 섹션으로 통합 정리(계약/현황/미완료 항목 분리).** | **MadCamp02** |
 
 ### Ver 2.6 주요 변경 사항
 
@@ -80,6 +84,63 @@
 3.  **WebSocket 구독 관리자**: Finnhub 50 Symbols 제한 대응을 위한 Dynamic Subscription Manager (LRU 기반) 구현 계획 추가.
 4.  **Market Movers 캐싱**: Redis 기반 1분~5분 캐싱 전략 명시.
 5.  **에러 처리**: Quota 초과 시 Case A(기존 데이터 반환 + Stale 표시) 또는 Case B(429 에러) 분기 처리 명시.
+
+---
+
+## ✅ 현재까지 완료된 구현/연동 요약 (Snapshot)
+
+> 목적: “지금 당장 돌아가는 것(완료)”과 “백엔드가 유지해야 할 계약(필수)”을 한 눈에 고정합니다.  
+> 상세 프론트 관점 연결 상태는 `docs/FRONTEND_API_WIRING.md`를 단일 진실로 함께 참고합니다.
+
+### 1) 인증/Auth (Hybrid)
+
+- **완료**
+  - `POST /api/v1/auth/signup|login|refresh`, `GET /api/v1/auth/me`
+  - Frontend-Driven: `POST /api/v1/auth/oauth/kakao|google`
+  - Backend-Driven: `/oauth2/authorization/{provider}` → `/oauth/callback` 리다이렉트
+- **계약(중요)**
+  - `GET /api/v1/auth/me`는 프론트 `hasCompletedOnboarding(user)` 판단을 위해 `birthDate`, `sajuElement`(또는 `saju.element`)를 **항상** 포함
+  - Kakao 스코프는 `profile_nickname`만 필수, 이메일 미제공 시 백엔드가 임의 이메일 프로비저닝
+
+### 2) 온보딩/User
+
+- **완료**
+  - `POST /api/v1/user/onboarding`는 **최초 온보딩 + 재온보딩(마이페이지 사주 재계산)**을 모두 처리하는 **idempotent** 엔드포인트
+  - `GET/PUT /api/v1/user/me`, `GET /api/v1/user/wallet`, Watchlist CRUD
+- **계약(중요)**
+  - 온보딩 전용 에러 코드: `ONBOARDING_001~003`를 `ErrorResponse.error`로 내려주고(가능하면 `fieldErrors` 포함) 프론트가 코드 기반 UX를 유지할 수 있게 함
+
+### 3) Market/Stock (캐싱 포함)
+
+- **완료**
+  - Market: `GET /api/v1/market/indices|news|movers` (ETF: SPY/QQQ/DIA)
+  - Stock: search/quote/candles/orderbook 등 프론트가 요구하는 REST 계약 기반 연동
+- **계약(중요)**
+  - `/api/v1/market/**`는 `X-Cache-Status`, `X-Cache-Age`, `X-Data-Freshness` 헤더를 일관되게 포함(프론트는 헤더를 UI 배지로 노출)
+  - Candles는 EODHD 무료 제한(최근 1년) + Quota 정책에 따른 `stale`/에러 분기 유지
+
+### 4) Trade/Portfolio Engine
+
+- **완료**
+  - `GET /api/v1/trade/available-balance|portfolio|history`, `POST /api/v1/trade/order`
+  - 비관적 락/트랜잭션 전략 및 테스트 문서화
+
+### 5) Game/Shop/Inventory/Ranking
+
+- **완료**
+  - `GET /api/v1/game/items|inventory|ranking`, `POST /api/v1/game/gacha`, `PUT /api/v1/game/equip/{itemId}`
+  - 카테고리 규약 `NAMEPLATE|AVATAR|THEME`, 가챠 에러 코드 `GAME_001~003`
+
+### 6) Calc/FX (1차 버전)
+
+- **완료(1차)**
+  - Calc: `GET /api/v1/calc/dividend`, `GET /api/v1/calc/tax` (USD 기준 계산, `currency=null`)
+  - FX: `exchange_rates` 테이블 및 `/api/v1/exchange-rates`, `/api/v1/exchange-rates/latest` (설계/구현 현황 반영)
+
+### 7) 미완료/후속
+
+- **AI(SSE) 연동**: `POST /api/v1/chat/ask`의 SSE 프록시/저장/스트리밍 UX는 계획 대비 미완(프론트는 HTTP 호출 기반, SSE는 후속)
+- **관리자 기능/확장 전략**: Market Movers 관리자/다중 Historical Provider 등은 Phase 8~9로 유지
 
 ---
 
@@ -233,6 +294,21 @@ erDiagram
     - `category` 컬럼 ENUM: `NAMEPLATE` (이름표/테두리), `AVATAR` (아바타 장식), `THEME` (앱 테마)
     - 프론트엔드 `Shop` 페이지 탭 구성과 정확히 일치
 
+3.  **ExchangeRates 테이블 (환율) 🆕**
+    - 테이블명: `exchange_rates`
+    - 용도: 한국수출입은행 Open API(AP01 - 현재 환율)에서 수집한 환율 정보를 일별로 저장
+    - 주요 컬럼:
+        - `as_of_date` (DATE): 환율 기준일 (예: `2026-01-21`)
+        - `cur_unit` (VARCHAR(20)): 통화 코드 (예: `USD`, `JPY(100)`)
+        - `cur_nm` (VARCHAR(100)): 국가/통화명 (예: `미국 달러`)
+        - `deal_bas_r` (NUMERIC(18,6)): 매매 기준율
+        - `ttb`, `tts`, `bkpr`, `kftc_deal_bas_r`, `kftc_bkpr` (선택): 수출입은행 원본 필드
+        - `created_at`, `updated_at` (TIMESTAMP)
+    - 제약:
+        - `(as_of_date, cur_unit)` 유니크 인덱스(`ux_exchange_rates_asof_curunit`)로 Upsert 기준 키를 고정
+    - 변환 규칙:
+        - Open API의 숫자 문자열(`deal_bas_r` 등)은 콤마 제거 후 `BigDecimal`로 파싱해서 저장
+
 ---
 
 ## 6. API 상세 설계
@@ -277,7 +353,54 @@ erDiagram
 | GET    | `/api/v1/calc/dividend` | 보유 종목 기반 예상 배당금 및 세금 계산 |
 | GET    | `/api/v1/calc/tax`      | 실현 수익 기반 예상 양도소득세 계산     |
 
-### 6.5 Auth API (기존 유지)
+#### 6.4.1 배당/세금 계산 쿼리 파라미터 (1차 버전)
+
+- **공통 전제**
+    - Calc 내부 계산은 **USD 기준**으로 수행한다.
+    - 통화 변환(`currency` 파라미터, `fxAsOf`, `fxRateUsed`)은 향후 `exchange_rates` 테이블을 사용해 확장할 계획이며, 현재 버전에서는 응답의 `currency`를 `null`로 유지한다.
+
+- **GET `/api/v1/calc/dividend`**
+    - **Query**
+        - `assumedDividendYield?: number` — 배당 수익률 (예: `0.03` = 3%)
+        - `dividendPerShare?: number` — 주당 배당액 (현재 버전에서는 미사용, 향후 종목별 포지션 기반 계산에서 활용 예정)
+        - `taxRate?: number` — 배당소득세 세율 (예: `0.154` = 15.4%)
+    - **처리**
+        - 기준 금액: 지갑의 `wallet.totalAssets` (USD 기준)
+        - `totalDividend = totalAssets × assumedDividendYield` (assumedDividendYield가 없으면 0)
+        - `withholdingTax = totalDividend × taxRate` (taxRate가 없으면 0)
+        - `netDividend = totalDividend - withholdingTax`
+
+- **GET `/api/v1/calc/tax`**
+    - **Query**
+        - `taxRate?: number` — 양도소득세 세율 (예: `0.22` = 22%)
+    - **처리**
+        - 기준 금액: 지갑의 `wallet.realizedProfit` (USD 기준)
+        - `taxBase = max(realizedProfit, 0)`
+        - `estimatedTax = taxBase × taxRate` (taxRate가 없으면 0)
+
+> 다통화(calc `currency` 파라미터, 환율 기반 변환)는 `docs/FRONTEND_API_WIRING.md` 및 `plans/fx-batch-and-multi-currency-calc`에 Future work로 명시되어 있으며, 향후 `exchange_rates` 테이블과 `/api/v1/exchange-rates` API를 기반으로 확장된다.
+
+### 6.5 Exchange Rate API (신규) 🆕
+
+프론트엔드 `/calculator` 페이지와 통화 선택 UI, 향후 다통화 Calc 지원을 위한 환율 조회 API.
+
+| 메서드 | 경로                             | 설명                                       |
+| ------ | -------------------------------- | ------------------------------------------ |
+| GET    | `/api/v1/exchange-rates`        | 특정 일자의 환율 리스트 조회 (`date` 쿼리) |
+| GET    | `/api/v1/exchange-rates/latest` | 가장 최근 기준일(`as_of_date`) 환율 조회    |
+
+- **GET `/api/v1/exchange-rates`**
+    - Query:
+        - `date?: string(yyyy-MM-dd)` — 지정하지 않으면 오늘 날짜 기준(주말 보정 포함)
+    - Response (요약):
+        - `asOf: string(yyyy-MM-dd)` — 환율 기준일
+        - `items: { curUnit, curNm, dealBasR, ttb, tts }[]`
+
+- **GET `/api/v1/exchange-rates/latest`**
+    - Query 없음
+    - `exchange_rates`에서 `as_of_date`가 가장 큰 레코드 기준으로 동일 형식 응답
+
+### 6.6 Auth API (기존 유지)
 
 | 메서드 | 경로                  | 설명                              |
 | ------ | --------------------- | --------------------------------- |
@@ -458,8 +581,13 @@ MadCamp02는 다양한 클라이언트 환경(Web, Mobile, External)을 지원�
 - **엔드포인트**:
   - `GET /api/v1/user/me` (`UserMeResponse`, email 포함)
   - `PUT /api/v1/user/me` (nickname, is_public, is_ranking_joined 등)
-  - `POST /api/v1/user/onboarding` (정밀 사주 계산: 성별/양력음력/시간 포함)
+  - `POST /api/v1/user/onboarding` (정밀 사주 계산: 성별/양력음력/시간 포함).  
+    → 이 엔드포인트는 **최초 온보딩과 마이페이지에서의 사주 정보 재계산(재온보딩)**을 모두 처리하는 **단일 idempotent 진입점**으로 사용된다. 동일 사용자에 대해 반복 호출 시 `users.birth_date/birth_time/gender/calendar_type/saju_element/zodiac_sign` 컬럼을 새 입력값 기준으로 항상 덮어쓴다.
   - `GET /api/v1/user/wallet`
+- **온보딩 완료 해석 규칙 및 소셜 플래그 역할**
+  - 온보딩 완료 여부는 별도의 boolean 컬럼 없이, `users.birth_date IS NOT NULL` 이고 `users.saju_element IS NOT NULL`인 경우로 해석한다.
+  - 프론트엔드는 `/api/v1/auth/me` 또는 `/api/v1/user/me` 응답을 기반으로 동일한 규칙을 사용해 `hasCompletedOnboarding(user)`를 계산하며, 메인 기능 접근 전 온보딩을 강제한다.
+  - 소셜 로그인 응답 DTO의 `isNewUser` 플래그는 **라우팅 힌트**로만 사용되며, 권한/보안 판단은 항상 JWT 및 DB 상태(`birth_date/saju_element`)를 기준으로 한다.
 - **DB 스키마 확장 (Flyway V4)**:
   - `users.birth_time` (TIME): 생년월일시 (기본값 00:00:00)
   - `users.gender` (VARCHAR): 성별 (MALE/FEMALE/OTHER)
@@ -1043,8 +1171,8 @@ sequenceDiagram
 
 ---
 
-**문서 버전:** 2.7.16 (Phase 6: Finnhub WebSocket + Phase 3.6/3.4 캐싱·Candles 범위 필터링 반영)  
-**최종 수정일:** 2026-01-19
+**문서 버전:** 2.7.20 (온보딩 완료 해석 규칙 + `/auth/me`·`hasCompletedOnboarding` 구현 정합성 및 테스트 계정 비밀번호 정책 반영)  
+**최종 수정일:** 2026-01-21
 
 ---
 

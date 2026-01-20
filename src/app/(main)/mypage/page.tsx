@@ -1,7 +1,9 @@
 "use client";
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useUserStore } from "@/stores/user-store";
+import { userApi } from "@/lib/api/user";
+import { useAuthStore } from "@/stores/auth-store";
 
 export default function MyPage() {
     // Global Store
@@ -21,12 +23,74 @@ export default function MyPage() {
         setRankingJoined
     } = useUserStore();
 
+    const { checkAuth } = useAuthStore();
+
+    // 사주/온보딩 관련 로컬 상태 (마이페이지에서 재계산에만 사용)
+    const [birthDate, setBirthDate] = useState<string>("");
+    const [birthTime, setBirthTime] = useState<string>("");
+    const [gender, setGender] = useState<"MALE" | "FEMALE" | "OTHER" | "">("");
+    const [calendarType, setCalendarType] = useState<"SOLAR" | "LUNAR" | "LUNAR_LEAP">("SOLAR");
+    const [recalcLoading, setRecalcLoading] = useState(false);
+    const [recalcError, setRecalcError] = useState<string | null>(null);
+    const [recalcSuccess, setRecalcSuccess] = useState<string | null>(null);
+
     // 초기 로드
     useEffect(() => {
         fetchProfile().catch(() => {});
         fetchInventory().catch(() => {});
         fetchWallet().catch(() => {});
     }, [fetchProfile, fetchInventory, fetchWallet]);
+
+    // 프로필 변화 시 로컬 사주 입력값 동기화
+    useEffect(() => {
+        if (!profile) return;
+        setBirthDate(profile.birthDate || "");
+        setBirthTime(profile.birthTime || "");
+        setGender(profile.gender || "");
+        setCalendarType(profile.calendarType || "SOLAR");
+    }, [profile]);
+
+    const handleRecalculateSaju = async () => {
+        if (!profile) return;
+
+        setRecalcError(null);
+        setRecalcSuccess(null);
+
+        // 간단 검증
+        if (!birthDate || !gender || !calendarType) {
+            setRecalcError("생년월일, 성별, 달력 유형은 필수입니다.");
+            return;
+        }
+
+        // 확인 모달
+        const confirmed = window.confirm("사주 정보를 다시 계산하시겠습니까? 기존 사주 기반 분석이 모두 새 값으로 대체됩니다.");
+        if (!confirmed) return;
+
+        try {
+            setRecalcLoading(true);
+            await userApi.submitOnboarding({
+                nickname: profile.nickname,
+                birthDate,
+                birthTime: birthTime || undefined,
+                gender: gender as "MALE" | "FEMALE" | "OTHER",
+                calendarType,
+            });
+
+            // 온보딩과 동일하게 /user/me 및 연관 스토어를 최신화한다.
+            try {
+                await checkAuth();
+            } catch (refreshError) {
+                console.warn("[MyPage] checkAuth after saju recalc failed:", refreshError);
+            }
+
+            setRecalcSuccess("사주 정보가 다시 계산되었습니다.");
+        } catch (error: any) {
+            const msg = error?.response?.data?.message || "사주 재계산 중 오류가 발생했습니다.";
+            setRecalcError(msg);
+        } finally {
+            setRecalcLoading(false);
+        }
+    };
 
     return (
         <div className="h-full w-full flex flex-col overflow-hidden bg-background" suppressHydrationWarning>
@@ -176,57 +240,114 @@ export default function MyPage() {
                         </div>
                     </div>
 
-                    {/* Right Column: Settings (5/12) */}
-                    <div className="col-span-5 flex flex-col gap-6">
-                        {/* Account Settings */}
-                        <div className="flex-[2] bg-card border border-border rounded-2xl p-6">
-                            <h2 className="text-foreground font-bold mb-6 border-b-2 border-purple-500 pb-1 self-start">계정 설정</h2>
-                            <div className="space-y-5">
-                                <div>
-                                    <label className="block text-muted-foreground text-xs mb-1.5">닉네임</label>
-                                    <input
-                                        type="text"
-                                        value={profile?.nickname || ''}
-                                        onChange={(e) => updateProfile({ nickname: e.target.value })}
-                                        className="w-full bg-secondary border border-border rounded-xl px-4 py-3 text-foreground text-sm outline-none focus:border-purple-500 transition-colors"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-muted-foreground text-xs mb-1.5">이메일</label>
-                                    <input
-                                        type="email"
-                                        value={profile?.email || ''}
-                                        onChange={(e) => updateProfile({ email: e.target.value })}
-                                        className="w-full bg-secondary border border-border rounded-xl px-4 py-3 text-foreground text-sm outline-none focus:border-purple-500 transition-colors"
-                                    />
-                                </div>
-                                <div className="grid grid-cols-2 gap-4">
+                        {/* Right Column: Settings (5/12) */}
+                        <div className="col-span-5 flex flex-col gap-6">
+                            {/* Account Settings */}
+                            <div className="flex-[2] bg-card border border-border rounded-2xl p-6">
+                                <h2 className="text-foreground font-bold mb-6 border-b-2 border-purple-500 pb-1 self-start">계정 설정</h2>
+                                <div className="space-y-5">
                                     <div>
-                                        <label className="block text-muted-foreground text-xs mb-1.5">생년월일 (온보딩)</label>
+                                        <label className="block text-muted-foreground text-xs mb-1.5">닉네임</label>
                                         <input
-                                            type="date"
-                                            value={profile?.birthDate || ''}
-                                            readOnly
-                                            className="w-full bg-secondary border border-border rounded-xl px-4 py-3 text-foreground text-sm outline-none cursor-default"
+                                            type="text"
+                                            value={profile?.nickname || ''}
+                                            onChange={(e) => updateProfile({ nickname: e.target.value })}
+                                            className="w-full bg-secondary border border-border rounded-xl px-4 py-3 text-foreground text-sm outline-none focus:border-purple-500 transition-colors"
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-muted-foreground text-xs mb-1.5">태어난 시각 (온보딩)</label>
+                                        <label className="block text-muted-foreground text-xs mb-1.5">이메일</label>
                                         <input
-                                            type="time"
-                                            value={profile?.birthTime || ''}
-                                            readOnly
-                                            className="w-full bg-secondary border border-border rounded-xl px-4 py-3 text-foreground text-sm outline-none cursor-default"
+                                            type="email"
+                                            value={profile?.email || ''}
+                                            onChange={(e) => updateProfile({ email: e.target.value })}
+                                            className="w-full bg-secondary border border-border rounded-xl px-4 py-3 text-foreground text-sm outline-none focus:border-purple-500 transition-colors"
                                         />
                                     </div>
-                                </div>
-                                {/* 온보딩 기반 사주 정보는 1차 버전에서는 읽기 전용으로만 노출 */}
-                                <div className="mt-3 text-xs text-muted-foreground space-y-1">
-                                    <p>사주 오행: <span className="font-semibold text-foreground">{profile?.sajuElement || '미설정'}</span></p>
-                                    <p>띠: <span className="font-semibold text-foreground">{profile?.zodiacSign || '미설정'}</span></p>
+
+                                    {/* 사주/온보딩 설정 - 재계산 지원 */}
+                                    <div className="rounded-xl border border-border bg-secondary/60 p-4 space-y-3">
+                                        <p className="text-xs text-muted-foreground mb-1">
+                                            사주 정보(생년월일/시간/성별/달력)는 AI 도사 조언과 캐릭터 컨셉에 영향을 줍니다. 잘못 입력했다면 아래 값을 수정한 뒤{" "}
+                                            <span className="font-semibold text-foreground">사주 다시 계산하기</span>를 눌러주세요.
+                                        </p>
+
+                                        {recalcError && (
+                                            <div className="bg-red-500/10 border border-red-500/40 text-red-400 text-xs px-3 py-2 rounded-lg">
+                                                {recalcError}
+                                            </div>
+                                        )}
+                                        {recalcSuccess && (
+                                            <div className="bg-green-500/10 border border-green-500/40 text-green-400 text-xs px-3 py-2 rounded-lg">
+                                                {recalcSuccess}
+                                            </div>
+                                        )}
+
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="block text-muted-foreground text-xs mb-1.5">생년월일</label>
+                                                <input
+                                                    type="date"
+                                                    value={birthDate}
+                                                    onChange={(e) => setBirthDate(e.target.value)}
+                                                    className="w-full bg-background border border-border rounded-xl px-4 py-3 text-foreground text-sm outline-none focus:border-purple-500 transition-colors"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-muted-foreground text-xs mb-1.5">태어난 시각 (선택)</label>
+                                                <input
+                                                    type="time"
+                                                    value={birthTime}
+                                                    onChange={(e) => setBirthTime(e.target.value)}
+                                                    className="w-full bg-background border border-border rounded-xl px-4 py-3 text-foreground text-sm outline-none focus:border-purple-500 transition-colors"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="block text-muted-foreground text-xs mb-1.5">성별</label>
+                                                <select
+                                                    value={gender}
+                                                    onChange={(e) => setGender(e.target.value as "MALE" | "FEMALE" | "OTHER" | "")}
+                                                    className="w-full bg-background border border-border rounded-xl px-4 py-3 text-foreground text-sm outline-none focus:border-purple-500 transition-colors"
+                                                >
+                                                    <option value="">선택하세요</option>
+                                                    <option value="MALE">남성</option>
+                                                    <option value="FEMALE">여성</option>
+                                                    <option value="OTHER">기타</option>
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label className="block text-muted-foreground text-xs mb-1.5">달력 종류</label>
+                                                <select
+                                                    value={calendarType}
+                                                    onChange={(e) => setCalendarType(e.target.value as "SOLAR" | "LUNAR" | "LUNAR_LEAP")}
+                                                    className="w-full bg-background border border-border rounded-xl px-4 py-3 text-foreground text-sm outline-none focus:border-purple-500 transition-colors"
+                                                >
+                                                    <option value="SOLAR">양력</option>
+                                                    <option value="LUNAR">음력</option>
+                                                    <option value="LUNAR_LEAP">음력(윤달)</option>
+                                                </select>
+                                            </div>
+                                        </div>
+
+                                        <div className="mt-2 text-xs text-muted-foreground space-y-1">
+                                            <p>현재 사주 오행: <span className="font-semibold text-foreground">{profile?.sajuElement || '미설정'}</span></p>
+                                            <p>현재 띠: <span className="font-semibold text-foreground">{profile?.zodiacSign || '미설정'}</span></p>
+                                        </div>
+
+                                        <button
+                                            type="button"
+                                            onClick={handleRecalculateSaju}
+                                            disabled={recalcLoading || !profile}
+                                            className="w-full mt-3 py-2.5 bg-gradient-to-r from-yellow-500 to-orange-500 text-black font-bold rounded-xl hover:brightness-110 transition-all shadow-lg shadow-orange-500/20 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                                        >
+                                            {recalcLoading ? "사주 다시 계산 중..." : "사주 다시 계산하기"}
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
 
                         {/* Public Settings */}
                         <div className="flex-[1] bg-card border border-border rounded-2xl p-6">

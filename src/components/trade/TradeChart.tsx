@@ -427,7 +427,7 @@ export default function TradeChart({ ticker, timeframe = 'd' }: TradeChartProps)
             }
             seriesRef.current = null;
         };
-    }, [theme, timeframe, onTimeframeChange]); // theme 또는 timeframe 변경 시 재생성하여 캔들 크기 업데이트
+    }, [theme, timeframe]); // theme 또는 timeframe 변경 시 재생성하여 캔들 크기 업데이트
 
     // 테마 변경 시 차트 스타일 업데이트
     useEffect(() => {

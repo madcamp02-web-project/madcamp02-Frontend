@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { StockPrice } from '@/types/stock';
 import { immer } from 'zustand/middleware/immer';
+import { enableMapSet } from 'immer';
 import { stockApi } from '@/lib/api/stock';
 import { userApi } from '@/lib/api/user';
 import {
@@ -14,6 +15,9 @@ import {
     UserWatchlistResponse,
 } from '@/types/api';
 import { getCache, setCache, CACHE_KEYS } from '@/lib/cache';
+
+// Immer에서 Map/Set을 안전하게 쓰기 위한 플러그인 활성화
+enableMapSet();
 
 // 백엔드 Redis 캐시 상태 (Phase 3.6)
 interface BackendCacheMetadata {

@@ -37,7 +37,7 @@ declare global {
 
 export default function LoginPage() {
     const router = useRouter();
-    const { login, loginAsGuest, error: authError } = useAuthStore();
+    const { login, loginAsGuest, checkAuth, error: authError } = useAuthStore();
     const [isLoading, setIsLoading] = useState(false);
 
     // Form State
@@ -50,8 +50,21 @@ export default function LoginPage() {
         try {
             console.log('[LoginPage] 로그인 시도:', { email });
             await login({ email, password });
-            console.log('[LoginPage] 로그인 성공, 리다이렉트');
-            router.push('/'); // Redirect to dashboard on success
+            console.log('[LoginPage] 로그인 성공, /api/v1/auth/me 조회로 온보딩 상태 확인');
+
+            // 로그인 성공 후 /api/v1/auth/me를 통해 최신 사용자 정보를 가져온다.
+            try {
+                await checkAuth();
+            } catch (checkError) {
+                console.warn('[LoginPage] checkAuth 실패, 토큰은 존재할 수 있으므로 일단 메인으로 이동:', checkError);
+            }
+
+            // 최신 스토어 상태에서 온보딩 완료 여부를 다시 평가한다.
+            const state = useAuthStore.getState();
+            const needOnboarding = !hasCompletedOnboarding(state.user);
+
+            console.log('[LoginPage] 온보딩 필요 여부:', { needOnboarding });
+            router.push(needOnboarding ? '/onboarding' : '/');
         } catch (err: any) {
             console.error("[LoginPage] Login Error:", err);
             // 에러는 auth-store에서 이미 설정되므로 UI에 표시됨

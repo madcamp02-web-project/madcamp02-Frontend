@@ -42,17 +42,21 @@ api.interceptors.request.use(
 api.interceptors.response.use(
     (response) => {
         // 백엔드 Redis 캐싱 헤더 처리 (Phase 3.6)
-        const cacheStatus = response.headers['x-cache-status'];
-        const cacheAge = response.headers['x-cache-age'];
-        const dataFreshness = response.headers['x-data-freshness'];
-        
-        // 캐시 메타데이터를 response 객체에 추가하여 store에서 접근 가능하도록 함
-        if (cacheStatus || cacheAge || dataFreshness) {
-            (response as any).cacheMetadata = {
-                status: cacheStatus,
-                age: cacheAge ? parseInt(cacheAge, 10) : null,
-                freshness: dataFreshness,
-            };
+        // Market 관련 엔드포인트(/api/v1/market/*)에 대해서만 캐시 메타데이터를 파싱한다.
+        const url = response.config?.url || '';
+        if (url.startsWith('/api/v1/market')) {
+            const cacheStatus = response.headers['x-cache-status'];
+            const cacheAge = response.headers['x-cache-age'];
+            const dataFreshness = response.headers['x-data-freshness'];
+
+            // 캐시 메타데이터를 response 객체에 추가하여 store에서 접근 가능하도록 함
+            if (cacheStatus || cacheAge || dataFreshness) {
+                (response as any).cacheMetadata = {
+                    status: cacheStatus,
+                    age: cacheAge ? parseInt(cacheAge, 10) : null,
+                    freshness: dataFreshness,
+                };
+            }
         }
         
         return response;
@@ -111,26 +115,41 @@ api.interceptors.response.use(
         
         // 백엔드 Redis 캐싱 헤더 처리 (Phase 3.6) - 에러 응답에도 캐시 메타데이터가 있을 수 있음
         if (response) {
-            const cacheStatus = response.headers['x-cache-status'];
-            const cacheAge = response.headers['x-cache-age'];
-            const dataFreshness = response.headers['x-data-freshness'];
-            
-            if (cacheStatus || cacheAge || dataFreshness) {
-                (error.response as any).cacheMetadata = {
-                    status: cacheStatus,
-                    age: cacheAge ? parseInt(cacheAge, 10) : null,
-                    freshness: dataFreshness,
-                };
+            const url = response.config?.url || '';
+            if (url.startsWith('/api/v1/market')) {
+                const cacheStatus = response.headers['x-cache-status'];
+                const cacheAge = response.headers['x-cache-age'];
+                const dataFreshness = response.headers['x-data-freshness'];
+
+                if (cacheStatus || cacheAge || dataFreshness) {
+                    (error.response as any).cacheMetadata = {
+                        status: cacheStatus,
+                        age: cacheAge ? parseInt(cacheAge, 10) : null,
+                        freshness: dataFreshness,
+                    };
+                }
             }
         }
         
         // 기타 오류는 그대로 전달
         // 에러 로깅 개선: 유용한 정보만 출력
-        const errorInfo: any = {
-            url: config?.url || 'unknown',
-            method: config?.method || 'unknown',
-        };
-        
+        const errorInfo: any = {};
+
+        // 기본적인 요청 URL (config 또는 response.config 기준)
+        const requestUrl: string | undefined = config?.url || response?.config?.url;
+
+        // 1) 특정 엔드포인트는 조용히 실패하도록 로그 자체를 생략한다.
+        //    - 예: 호가(Orderbook)는 UI에서 조용히 fallback 하므로 콘솔 에러를 찍지 않는다.
+        if (requestUrl && requestUrl.startsWith('/api/v1/stock/orderbook')) {
+            return Promise.reject(error);
+        }
+
+        // 기본적인 요청 정보
+        if (config) {
+            errorInfo.url = config.url || 'unknown';
+            errorInfo.method = config.method || 'unknown';
+        }
+
         if (response) {
             errorInfo.status = response.status;
             errorInfo.statusText = response.statusText;
@@ -140,16 +159,30 @@ api.interceptors.response.use(
                 errorInfo.responseData = JSON.stringify(response.data).substring(0, 200);
             }
         } else {
-            errorInfo.code = code || 'UNKNOWN';
-            errorInfo.message = message || 'Network error or unknown error';
+            if (code) {
+                errorInfo.code = code;
+            }
+            if (message) {
+                errorInfo.message = message;
+            }
         }
-        
-        // 개발 환경에서만 상세 로그 출력, 프로덕션에서는 간단히만
-        if (process.env.NODE_ENV === 'development') {
-            console.error('[API] Request failed:', errorInfo);
-        } else {
-            // 프로덕션에서는 간단히만 로그 (에러 추적용)
-            console.error('[API] Request failed:', errorInfo.url, errorInfo.status || errorInfo.code, errorInfo.message);
+
+        // errorInfo에 유의미한 정보가 없으면 콘솔 로그를 생략해 불필요한 {} 로그를 줄인다.
+        const hasInfo = Object.keys(errorInfo).length > 0;
+
+        if (hasInfo) {
+            // 개발 환경에서만 상세 로그 출력, 프로덕션에서는 간단히만
+            if (process.env.NODE_ENV === 'development') {
+                console.error('[API] Request failed:', errorInfo);
+            } else {
+                // 프로덕션에서는 간단히만 로그 (에러 추적용)
+                console.error(
+                    '[API] Request failed:',
+                    errorInfo.url || 'unknown',
+                    errorInfo.status || errorInfo.code || 'UNKNOWN',
+                    errorInfo.message || 'Unknown error'
+                );
+            }
         }
         
         return Promise.reject(error);

@@ -7,6 +7,7 @@ import { userApi } from "@/lib/api/user";
 import { SajuInfo } from "@/types/user";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/stores/auth-store";
+import { parseError } from "@/lib/api/error";
 
 type OnboardingStep = "profile" | "survey" | "analyzing" | "result";
 
@@ -25,15 +26,18 @@ export default function OnboardingPage() {
     const [result, setResult] = useState<SajuInfo | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
     const handleNext = async () => {
         if (currentStep === "profile") {
+            setFieldErrors({});
             if (!formData.nickname || !formData.birthDate || !formData.gender) {
                 setError("필수 항목을 모두 입력해주세요.");
                 return;
             }
             setCurrentStep("survey");
         } else if (currentStep === "survey") {
+            setFieldErrors({});
             if (!formData.investmentStyle) {
                 setError("투자 성향을 선택해주세요.");
                 return;
@@ -76,7 +80,30 @@ export default function OnboardingPage() {
                     setIsLoading(false);
                 }, 1500);
             } catch (err: any) {
-                setError(err.response?.data?.message || "온보딩 처리 중 오류가 발생했습니다.");
+                // 공통 에러 파서 사용
+                const parsed = parseError(err);
+
+                // 온보딩 전용 에러 코드(ONBOARDING_001~003)에 따라 UX를 분기한다.
+                switch (parsed.code) {
+                    case "ONBOARDING_001":
+                        // 입력값 유효성 에러: 각 필드 옆에 구체 메시지를 표시한다.
+                        setError(null);
+                        setFieldErrors(parsed.fieldErrors || {
+                            birthDate: "생년월일과 시간, 성별, 달력 유형 조합을 다시 확인해주세요.",
+                        });
+                        break;
+                    case "ONBOARDING_002":
+                        // 음력/윤달 변환 에러: 상단에 안내 문구를 표시한다.
+                        setError("음력/윤달 변환 중 문제가 발생했습니다. 달력 종류와 생년월일을 다시 확인해주세요.");
+                        break;
+                    case "ONBOARDING_003":
+                        // 일반 사주 계산 실패: 일시적인 오류 안내
+                        setError("일시적인 오류입니다. 잠시 후 다시 시도해주세요.");
+                        break;
+                    default:
+                        setError(parsed.message || "온보딩 처리 중 오류가 발생했습니다.");
+                        break;
+                }
                 setIsLoading(false);
                 setCurrentStep("survey");
             }
@@ -122,6 +149,9 @@ export default function OnboardingPage() {
                                 value={formData.nickname}
                                 onChange={(e) => setFormData({ ...formData, nickname: e.target.value })}
                             />
+                            {fieldErrors.nickname && (
+                                <p className="mt-1 text-xs text-red-400">{fieldErrors.nickname}</p>
+                            )}
                             <div>
                                 <label className="text-sm text-gray-400 mb-2 block">Birth Date</label>
                                 <input
@@ -130,6 +160,9 @@ export default function OnboardingPage() {
                                     value={formData.birthDate}
                                     onChange={(e) => setFormData({ ...formData, birthDate: e.target.value })}
                                 />
+                                {fieldErrors.birthDate && (
+                                    <p className="mt-1 text-xs text-red-400">{fieldErrors.birthDate}</p>
+                                )}
                             </div>
                             <div>
                                 <label className="text-sm text-gray-400 mb-2 block">Birth Time (Optional)</label>
@@ -139,6 +172,9 @@ export default function OnboardingPage() {
                                     value={formData.birthTime}
                                     onChange={(e) => setFormData({ ...formData, birthTime: e.target.value })}
                                 />
+                                {fieldErrors.birthTime && (
+                                    <p className="mt-1 text-xs text-red-400">{fieldErrors.birthTime}</p>
+                                )}
                             </div>
                             <div>
                                 <label className="text-sm text-gray-400 mb-2 block">Gender (필수)</label>
@@ -152,6 +188,9 @@ export default function OnboardingPage() {
                                     <option value="FEMALE">여성</option>
                                     <option value="OTHER">기타</option>
                                 </select>
+                                {fieldErrors.gender && (
+                                    <p className="mt-1 text-xs text-red-400">{fieldErrors.gender}</p>
+                                )}
                             </div>
                             <div>
                                 <label className="text-sm text-gray-400 mb-2 block">Calendar Type (필수)</label>
@@ -164,6 +203,9 @@ export default function OnboardingPage() {
                                     <option value="LUNAR">음력</option>
                                     <option value="LUNAR_LEAP">윤달</option>
                                 </select>
+                                {fieldErrors.calendarType && (
+                                    <p className="mt-1 text-xs text-red-400">{fieldErrors.calendarType}</p>
+                                )}
                             </div>
                         </div>
 
@@ -182,6 +224,12 @@ export default function OnboardingPage() {
                                 평소 당신의 투자 성향은 어떤가요?
                             </p>
                         </div>
+
+                        {error && (
+                            <div className="mb-4 bg-red-500/20 border border-red-500/50 rounded-xl p-3 text-red-400 text-sm">
+                                {error}
+                            </div>
+                        )}
 
                         <div className="flex flex-col gap-4 flex-1 overflow-y-auto">
                             {["안전 제일! 예적금이 최고야 🛡️", "적당한 수익, 적당한 위험 ⚖️", "인생은 한방! 고위험 고수익 🔥"].map((option, idx) => (
@@ -207,8 +255,8 @@ export default function OnboardingPage() {
                             <Button variant="secondary" onClick={handleBack}>
                                 Back
                             </Button>
-                            <Button variant="primary" onClick={handleNext} disabled={!formData.investmentStyle}>
-                                Analyze Fate
+                            <Button variant="primary" onClick={handleNext} disabled={!formData.investmentStyle || isLoading}>
+                                {isLoading ? "Analyzing..." : "Analyze Fate"}
                             </Button>
                         </div>
                     </div>

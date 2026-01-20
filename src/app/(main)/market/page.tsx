@@ -133,8 +133,31 @@ export default function MarketNewsPage() {
         <div className="h-full w-full flex flex-col overflow-hidden" suppressHydrationWarning>
             {/* Header */}
             <div className="px-4 pt-2 pb-4 border-b border-border shrink-0">
-                <h1 className="text-2xl font-bold text-foreground">시장 현황</h1>
-                <p className="text-muted-foreground text-sm">실시간 시장 동향 및 뉴스</p>
+                <div className="flex items-center justify-between gap-4">
+                    <div>
+                        <h1 className="text-2xl font-bold text-foreground">시장 현황</h1>
+                        <p className="text-muted-foreground text-sm">실시간 시장 동향 및 뉴스</p>
+                    </div>
+                    {/* 백엔드 캐시 배지: 주로 지수 응답 메타를 기준으로 표기 */}
+                    {backendCache.indices && backendCache.indices.status && (
+                        <div className="flex items-center gap-2 text-xs">
+                            <span className="inline-flex items-center rounded-full px-2 py-1 border border-border bg-card text-muted-foreground">
+                                <span className="mr-1 font-semibold">Cache</span>
+                                <span className="mx-1 text-foreground">{backendCache.indices.status}</span>
+                                {typeof backendCache.indices.age === 'number' && (
+                                    <span className="text-muted-foreground">
+                                        · {backendCache.indices.age}s
+                                    </span>
+                                )}
+                                {backendCache.indices.freshness && (
+                                    <span className="ml-1 uppercase text-[10px] text-muted-foreground">
+                                        {backendCache.indices.freshness}
+                                    </span>
+                                )}
+                            </span>
+                        </div>
+                    )}
+                </div>
             </div>
 
             {/* Scrollable Content */}

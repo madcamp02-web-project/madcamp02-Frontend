@@ -34,6 +34,8 @@ export default function AssetChart() {
     const chartContainerRef = useRef<HTMLDivElement>(null);
     const chartRef = useRef<IChartApi | null>(null);
     const seriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
+    // 실시간 캔들을 시간별로 캐싱하기 위한 Map (time -> candle)
+    const realtimeCandlesRef = useRef<Map<number, CandlestickData<Time>>>(new Map());
     const { 
         prices, 
         currentQuote, 
