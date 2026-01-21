@@ -1,6 +1,6 @@
 # 📁 MadCamp02: 최종 통합 명세서
 
-**Ver 2.7.21 - Complete Edition (Spec-Driven Alignment)**
+**Ver 2.7.24 - Complete Edition (Spec-Driven Alignment)**
 
 ---
 
@@ -37,6 +37,10 @@
 | **2.7.18** | **2026-01-20** | **`POST /api/v1/user/onboarding`를 최초 온보딩과 마이페이지 사주 정보 재계산(재온보딩) 양쪽에서 사용하는 idempotent 엔드포인트로 고정하고, 소셜/일반 공통 온보딩 강제 플로우 및 `hasCompletedOnboarding` 판단 기준(`users.birth_date + users.saju_element`)을 명시.** | **MadCamp02** |
 | **2.7.19** | **2026-01-21** | **Calc API(배당/세금 계산) 1차 버전의 쿼리 파라미터/응답 스키마와 한국수출입은행 Open API 기반 환율 수집/조회 파이프라인(`exchange_rates` 테이블, `/api/v1/exchange-rates`)을 통합 명세에 반영. 온보딩 전용 에러 코드(ONBOARDING_001~003)도 ErrorCode 목록에 추가로 명시.** | **MadCamp02** |
 | **2.7.21** | **2026-01-21** | **프론트/백엔드 실제 구현 상태를 기준으로 “완료된 계약”을 Snapshot 섹션으로 고정하고, 문서 내 ‘구현 예정/완료’ 표현의 충돌을 정리(특히 Phase 5.5 관련 문구와 프론트 실연동 상태).** | **MadCamp02** |
+| **2.7.22** | **2026-01-21** | **AI 시스템 상세 스펙(모델 전략, AI 서버 API, Spring SSE 프록시, `/oracle` 연동)을 `docs/AI_SERVER_SPEC.md` v1.1.0으로 이전하고, 본 문서 9장은 전체 시스템 관점 요약+링크만 유지하도록 정리** | **MadCamp02** |
+| **2.7.23** | **2026-01-21** | **프론트엔드 도메인 변경에 맞춰 OAuth2 Redirect URL 예시 및 관련 설정에서 `http://localhost:3000`을 `http://madcampstock.duckdns.org`로 정규화** | **MadCamp02** |
+| **2.7.24** | **2026-01-21** | **페르소나 시스템 및 금융 데이터 통합 반영: 3개 페르소나(Sage/Analyst/Friend), LoRA Fine-tuning, 금융 데이터 동적 로딩, Fine-tuning 데이터 생성 스크립트 추가** | **MadCamp02** |
+| **2.7.24** | **2026-01-21** | **페르소나 시스템 및 금융 데이터 통합 반영: 3개 페르소나(Sage/Analyst/Friend), LoRA Fine-tuning, 금융 데이터 동적 로딩, Fine-tuning 데이터 생성 스크립트 추가** | **MadCamp02** |
 
 ### Ver 2.6 주요 변경 사항
 
@@ -206,7 +210,7 @@ Finnhub 실시간 주가 데이터를 기반으로, **사용자의 투자 성과
 ```
 
 - **WebSocket (STOMP) Endpoint**: `/ws-stomp`
-- **Oracle SSE Endpoint**: `POST /api/v1/chat/ask` (백엔드 프록시)
+- **Oracle SSE Endpoint**: `POST /api/v1/chat/ask` (백엔드 프록시, SSE. 상세 스펙은 AI 시스템 장 및 `AI_SERVER_SPEC` 참조)
 
 ---
 
@@ -1074,7 +1078,27 @@ sequenceDiagram
 
 > `/calculator` 페이지의 통화 선택 드롭다운과 금액 표시 포맷은 위 환율 API 응답을 기반으로 구현되며, Calc API의 다통화 확장 시 `exchange_rates`가 기준 데이터로 사용된다.
 
-### 5.8 Phase 5.5: 프론트 연동·DB 제약 보강 (Shop/Gacha/Inventory/Ranking)
+### 5.8 AI 도사 (`/oracle`) 및 페르소나 시스템 🆕
+
+- **역할 요약**: 사주/포트폴리오/랭킹 정보를 바탕으로 LLM이 도사 말투로 투자 조언을 해주는 채팅 페이지.
+- **연동 개요**:
+  - 프론트는 `src/stores/chat-store.ts`와 `src/lib/api/ai.ts`를 통해 Spring 백엔드의 `POST /api/v1/chat/ask`(SSE)를 호출한다.
+  - Spring은 FastAPI AI Gateway(`/api/v1/ai/**`)로 프록시하여 LLM 응답을 스트리밍으로 전달한다.
+- **페르소나 시스템**:
+  - 3개 페르소나 지원: 투자 도사(Sage), 데이터 분석가(Analyst), 친구 조언자(Friend)
+  - 사용자는 `/oracle` 페이지에서 페르소나를 선택할 수 있으며, 선택한 페르소나는 기본값으로 저장됨
+  - 각 페르소나는 LoRA Fine-tuning을 통해 특화된 말투와 스타일을 가짐
+  - 상세 스펙은 `docs/AI_SERVER_SPEC.md` 5장 참조
+- **금융 데이터 통합**:
+  - 질문 내용을 분석하여 필요한 금융 데이터(종목 가격, 시장 지수, 뉴스 등)를 동적으로 로드
+  - AI Gateway가 금융 데이터를 프롬프트에 자동 포함하여 더 정확하고 실용적인 조언 제공
+  - Fine-tuning 데이터 생성 시에도 실제 금융 API 데이터 활용 가능
+  - 상세 설계: `docs/AI_FINANCIAL_DATA_INTEGRATION.md` 참조
+- **상세 스펙**:
+  - SSE 포맷, 이벤트 타입(`message/done/error`), 에러 코드 매핑, 모델 라우팅/프롬프트 구성 등은  
+    **`docs/AI_SERVER_SPEC.md` v1.1.2의 3, 4, 6, 7, 9장을 단일 진실로 따른다.**
+
+### 5.9 Phase 5.5: 프론트 연동·DB 제약 보강 (Shop/Gacha/Inventory/Ranking)
 
 - **프론트 현재 상태(Ver 2.7.11)**: `/shop`·`/gacha`·`/ranking`·`/mypage`는 모의데이터/상수 기반으로 렌더링되며 Axios/STOMP/SSE 미연결.
 - **실데이터 전환 체크리스트**:
@@ -1153,7 +1177,7 @@ MadCamp02는 유연한 연동을 위해 두 가지 인증 흐름을 모두 제�
 1.  **로그인 요청**: 프론트엔드에서 `GET {BACKEND_URL}/oauth2/authorization/kakao`로 리다이렉트.
 2.  **인증 처리**: 백엔드에서 소셜 인증 후 JWT 생성.
 3.  **토큰 전달**: 백엔드가 프론트엔드의 `/oauth/callback`으로 리다이렉트하며 Query Parameter로 토큰 전달. _(프론트 라우트 구현: Phase 1)_
-    - 예: `http://localhost:3000/oauth/callback?accessToken=...&isNewUser=true`
+    - 예: `http://madcampstock.duckdns.org/oauth/callback?accessToken=...&isNewUser=true`
 4.  **세션 저장**: 프론트엔드에서 토큰 추출 후 스토리지 저장 및 `auth-store` 업데이트.
 5.  **Kakao 동의 스코프**: `profile_nickname` **단일 필수**로 요청한다. `account_email`은 요청하지 않으며, Kakao 응답에 이메일이 없을 경우 백엔드가 `kakao-{timestamp}-{random}@auth.madcamp02.local` 형식의 임의 이메일을 생성해 중복 검사 후 가입시킨다.
 
@@ -1688,5 +1712,13 @@ CREATE TABLE api_usage_logs (
 
 ---
 
-**문서 버전:** 2.7.18 (온보딩/마이페이지 사주 재계산 플로우 및 `/user/onboarding` idempotent 재온보딩 정책 반영)  
-**최종 수정일:** 2026-01-20
+**문서 버전:** 2.7.24 (페르소나 시스템 및 금융 데이터 통합 반영)  
+**최종 수정일:** 2026-01-21
+
+## 관련 문서
+
+- **AI 서버 명세**: `docs/AI_SERVER_SPEC.md` - AI 서버 전체 아키텍처 및 API 명세
+- **금융 데이터 통합**: `docs/AI_FINANCIAL_DATA_INTEGRATION.md` - 실제 금융 API 데이터를 활용한 대화 및 Fine-tuning
+- **페르소나 시스템 설계**: `docs/BACKEND_PERSONA_DESIGN.md` - 백엔드 페르소나 시스템 상세 설계
+- **ChatHistory 데이터 수집**: `docs/BACKEND_CHAT_HISTORY_API.md` - Fine-tuning용 실제 대화 데이터 수집 API
+- **Fine-tuning 가이드**: `ai-server/fine-tuning/README.md` - LoRA Fine-tuning 전체 프로세스 가이드
