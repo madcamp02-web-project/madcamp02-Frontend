@@ -1,11 +1,32 @@
 "use client";
 
-import React, { useEffect } from "react";
+import React, { useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuthStore } from "@/stores/auth-store";
 import { hasCompletedOnboarding } from "@/lib/utils";
 
+// Suspense 경계로 감싼 페이지 컴포넌트 (UI는 그대로 유지)
 export default function OAuthCallbackPage() {
+    return (
+        <Suspense
+            fallback={
+                <div className="min-h-screen bg-[#0F0F12] flex flex-col items-center justify-center" suppressHydrationWarning>
+                    <div
+                        className="w-16 h-16 border-4 border-[var(--accent-gold)] border-t-transparent rounded-full animate-spin mb-4"
+                        suppressHydrationWarning
+                    ></div>
+                    <p className="text-white text-lg font-medium" suppressHydrationWarning>
+                        로그인 처리 중...
+                    </p>
+                </div>
+            }
+        >
+            <OAuthCallbackContent />
+        </Suspense>
+    );
+}
+
+function OAuthCallbackContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const { checkAuth } = useAuthStore();
@@ -67,10 +88,16 @@ export default function OAuthCallbackPage() {
             });
     }, [searchParams, router]);
 
+    // Suspense fallback과 동일한 로딩 UI로 디자인 유지
     return (
         <div className="min-h-screen bg-[#0F0F12] flex flex-col items-center justify-center" suppressHydrationWarning>
-            <div className="w-16 h-16 border-4 border-[var(--accent-gold)] border-t-transparent rounded-full animate-spin mb-4" suppressHydrationWarning></div>
-            <p className="text-white text-lg font-medium" suppressHydrationWarning>로그인 처리 중...</p>
+            <div
+                className="w-16 h-16 border-4 border-[var(--accent-gold)] border-t-transparent rounded-full animate-spin mb-4"
+                suppressHydrationWarning
+            ></div>
+            <p className="text-white text-lg font-medium" suppressHydrationWarning>
+                로그인 처리 중...
+            </p>
         </div>
     );
 }

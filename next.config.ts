@@ -5,11 +5,11 @@ const nextConfig: NextConfig = {
     return [
       {
         source: '/api/:path*',
-        destination: 'http://localhost:8080/api/:path*',
+        destination: 'http://madcampbackend.royaljellynas.org/api/:path*',
       },
       {
         source: '/oauth2/:path*',
-        destination: 'http://localhost:8080/oauth2/:path*',
+        destination: 'http://madcampbackend.royaljellynas.org/oauth2/:path*',
       },
     ];
   },

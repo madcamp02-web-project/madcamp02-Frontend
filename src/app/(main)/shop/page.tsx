@@ -94,7 +94,8 @@ export default function ShopPage() {
         }
     };
 
-    const activeTheme = themeConfigs[activeTab === 'NAMEPLATE' ? 'name' : activeTab === 'AVATAR' ? 'avatar' : 'theme'];
+    const activeThemeKey = activeTab === 'NAMEPLATE' ? 'name' : activeTab === 'AVATAR' ? 'avatar' : 'theme';
+    const activeTheme = themeConfigs[activeThemeKey];
     const coins = wallet?.coin || 0;
     const currentItems = items[activeTab] || [];
 
@@ -194,7 +195,7 @@ export default function ShopPage() {
                             <div className="absolute top-4 left-4 w-12 h-24 bg-white/20 rounded-full blur-md transform -rotate-12 z-20"></div>
 
                             {/* Inner Glow based on Theme */}
-                            <div className={`absolute inset-0 bg-${activeTab === 'name' ? 'yellow' : activeTab === 'avatar' ? 'blue' : 'purple'}-500/20 dark:bg-${activeTab === 'name' ? 'yellow' : activeTab === 'avatar' ? 'blue' : 'purple'}-500/10 z-0`}></div>
+                            <div className={`absolute inset-0 bg-${activeThemeKey === 'name' ? 'yellow' : activeThemeKey === 'avatar' ? 'blue' : 'purple'}-500/20 dark:bg-${activeThemeKey === 'name' ? 'yellow' : activeThemeKey === 'avatar' ? 'blue' : 'purple'}-500/10 z-0`}></div>
 
                             {/* Capsules inside */}
                             <div className="absolute inset-4 flex flex-wrap justify-center items-center gap-1 p-4 z-10">
@@ -222,8 +223,8 @@ export default function ShopPage() {
                         {/* Machine body */}
                         <div className="w-64 bg-secondary border-2 border-gray-200 dark:border-white/20 border-t-0 rounded-b-2xl p-4 shadow-xl relative">
                             {/* Side LED Lines */}
-                            <div className={`absolute top-0 bottom-4 left-2 w-0.5 bg-${activeTab === 'name' ? 'yellow' : activeTab === 'avatar' ? 'blue' : 'purple'}-500/50 shadow-[0_0_5px_currentColor]`}></div>
-                            <div className={`absolute top-0 bottom-4 right-2 w-0.5 bg-${activeTab === 'name' ? 'yellow' : activeTab === 'avatar' ? 'blue' : 'purple'}-500/50 shadow-[0_0_5px_currentColor]`}></div>
+                            <div className={`absolute top-0 bottom-4 left-2 w-0.5 bg-${activeThemeKey === 'name' ? 'yellow' : activeThemeKey === 'avatar' ? 'blue' : 'purple'}-500/50 shadow-[0_0_5px_currentColor]`}></div>
+                            <div className={`absolute top-0 bottom-4 right-2 w-0.5 bg-${activeThemeKey === 'name' ? 'yellow' : activeThemeKey === 'avatar' ? 'blue' : 'purple'}-500/50 shadow-[0_0_5px_currentColor]`}></div>
 
                             {/* Control panel */}
                             <div className="flex items-center justify-between mb-3 px-2">

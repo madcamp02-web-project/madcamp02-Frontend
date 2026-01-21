@@ -42,7 +42,7 @@ export default function ChatbotPopup() {
         try {
             // 2. API Call - Inject Context if available
             let contextMessage = userText;
-            if (profile.birthDate) {
+            if (profile?.birthDate) {
                 const birthInfo = `${profile.birthDate} ${profile.birthTime || "00:00"}`;
                 // Prepend context invisibly to the user
                 contextMessage = `(컨텍스트 정보: 사용자 생년월일=${birthInfo}) ${userText}`;
@@ -62,7 +62,7 @@ export default function ChatbotPopup() {
     const handleQuickAction = async (type: "fortune" | "stock") => {
         if (isLoading) return;
 
-        if (!profile.birthDate) {
+        if (!profile?.birthDate) {
             addMessage({
                 text: "허허, 자네의 사주를 알아야 운세를 봐줄 수 있지 않겠나? '마이페이지'에서 생년월일을 먼저 알려주게.",
                 isUser: false

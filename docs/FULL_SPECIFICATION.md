@@ -1,6 +1,6 @@
 # 📁 MadCamp02: 최종 통합 명세서
 
-**Ver 2.7.24 - Complete Edition (Spec-Driven Alignment)**
+**Ver 2.7.26 - Complete Edition (Spec-Driven Alignment)**
 
 ---
 
@@ -38,9 +38,11 @@
 | **2.7.19** | **2026-01-21** | **Calc API(배당/세금 계산) 1차 버전의 쿼리 파라미터/응답 스키마와 한국수출입은행 Open API 기반 환율 수집/조회 파이프라인(`exchange_rates` 테이블, `/api/v1/exchange-rates`)을 통합 명세에 반영. 온보딩 전용 에러 코드(ONBOARDING_001~003)도 ErrorCode 목록에 추가로 명시.** | **MadCamp02** |
 | **2.7.21** | **2026-01-21** | **프론트/백엔드 실제 구현 상태를 기준으로 “완료된 계약”을 Snapshot 섹션으로 고정하고, 문서 내 ‘구현 예정/완료’ 표현의 충돌을 정리(특히 Phase 5.5 관련 문구와 프론트 실연동 상태).** | **MadCamp02** |
 | **2.7.22** | **2026-01-21** | **AI 시스템 상세 스펙(모델 전략, AI 서버 API, Spring SSE 프록시, `/oracle` 연동)을 `docs/AI_SERVER_SPEC.md` v1.1.0으로 이전하고, 본 문서 9장은 전체 시스템 관점 요약+링크만 유지하도록 정리** | **MadCamp02** |
-| **2.7.23** | **2026-01-21** | **프론트엔드 도메인 변경에 맞춰 OAuth2 Redirect URL 예시 및 관련 설정에서 `http://localhost:3000`을 `http://madcampstock.duckdns.org`로 정규화** | **MadCamp02** |
+| **2.7.23** | **2026-01-21** | **프론트엔드 도메인 변경에 맞춰 OAuth2 Redirect URL 예시 및 관련 설정에서 `http://madcamp.royaljellynas.org/`로 정규화** | **MadCamp02** |
 | **2.7.24** | **2026-01-21** | **페르소나 시스템 및 금융 데이터 통합 반영: 3개 페르소나(Sage/Analyst/Friend), LoRA Fine-tuning, 금융 데이터 동적 로딩, Fine-tuning 데이터 생성 스크립트 추가** | **MadCamp02** |
 | **2.7.24** | **2026-01-21** | **페르소나 시스템 및 금융 데이터 통합 반영: 3개 페르소나(Sage/Analyst/Friend), LoRA Fine-tuning, 금융 데이터 동적 로딩, Fine-tuning 데이터 생성 스크립트 추가** | **MadCamp02** |
+| **2.7.25** | **2026-01-21** | **도메인 정규화: 프론트(`http://madcamp.royaljellynas.org/`)·AI 서버(`http://madcampbackend.royaljellynas.org/`) 주소 일괄 교체 및 명세 반영** | **MadCamp02** |
+| **2.7.26** | **2026-01-21** | **도메인 최종 반영: 프론트(`http://madcamp.royaljellynas.org/`)·AI 서버(`http://madcampbackend.royaljellynas.org/`)로 전체 치환** | **MadCamp02** |
 
 ### Ver 2.6 주요 변경 사항
 
@@ -1177,7 +1179,7 @@ MadCamp02는 유연한 연동을 위해 두 가지 인증 흐름을 모두 제�
 1.  **로그인 요청**: 프론트엔드에서 `GET {BACKEND_URL}/oauth2/authorization/kakao`로 리다이렉트.
 2.  **인증 처리**: 백엔드에서 소셜 인증 후 JWT 생성.
 3.  **토큰 전달**: 백엔드가 프론트엔드의 `/oauth/callback`으로 리다이렉트하며 Query Parameter로 토큰 전달. _(프론트 라우트 구현: Phase 1)_
-    - 예: `http://madcampstock.duckdns.org/oauth/callback?accessToken=...&isNewUser=true`
+    - 예: `http://madcamp.royaljellynas.org/oauth/callback?accessToken=...&isNewUser=true`
 4.  **세션 저장**: 프론트엔드에서 토큰 추출 후 스토리지 저장 및 `auth-store` 업데이트.
 5.  **Kakao 동의 스코프**: `profile_nickname` **단일 필수**로 요청한다. `account_email`은 요청하지 않으며, Kakao 응답에 이메일이 없을 경우 백엔드가 `kakao-{timestamp}-{random}@auth.madcamp02.local` 형식의 임의 이메일을 생성해 중복 검사 후 가입시킨다.
 

@@ -79,7 +79,7 @@ export default function AssetChart() {
     const displayData = quote || priceData;
 
     // 종목명과 거래소 정보 (searchResults에서 찾기)
-    const selectedStock = searchResults?.items?.find(s => s.ticker === selectedTicker);
+    const selectedStock = searchResults?.items?.find(s => s.symbol === selectedTicker);
     const stockName = selectedStock?.name || (selectedTicker === 'AAPL' ? 'Apple Inc.' : selectedTicker);
     const stockExchange = selectedStock?.exchange || (selectedTicker === 'AAPL' ? 'NASDAQ' : '');
 
@@ -143,8 +143,8 @@ export default function AssetChart() {
             ticker: candles?.ticker,
             resolution: candles?.resolution,
             stale: candles?.stale,
-            hasItems: candles?.items?.length > 0,
-            itemsLength: candles?.items?.length || 0,
+            hasItems: (candles?.items?.length ?? 0) > 0,
+            itemsLength: candles?.items?.length ?? 0,
             selectedTicker,
             timeframe,
             lastFetchedTicker,
@@ -346,6 +346,10 @@ export default function AssetChart() {
         });
 
         // 집계된 캔들을 차트에 추가/업데이트
+        if (!seriesRef.current || !chartRef.current) {
+            return;
+        }
+
         candleMap.forEach((candleData, candleTime) => {
             const candle: CandlestickData<Time> = {
                 time: candleTime as Time,
@@ -360,7 +364,7 @@ export default function AssetChart() {
 
             try {
                 // 차트에 업데이트 (이미 있으면 업데이트, 없으면 추가)
-                seriesRef.current.update(candle);
+                seriesRef.current!.update(candle);
 
                 // 마지막 캔들 참조 업데이트
                 if (!lastCandleRef.current ||
@@ -369,7 +373,7 @@ export default function AssetChart() {
                 }
 
                 // 최신 데이터가 보이도록 스크롤
-                chartRef.current.timeScale().scrollToPosition(1, false);
+                chartRef.current!.timeScale().scrollToPosition(1, false);
             } catch (error) {
                 console.error('[AssetChart] 실시간 캔들 업데이트 실패:', error);
             }
@@ -472,13 +476,6 @@ export default function AssetChart() {
             layout: {
                 background: { type: ColorType.Solid, color: 'transparent' },
                 textColor: textColor,
-                // 하단 시간 축이 잘리지 않도록 여백 추가
-                padding: {
-                    top: 10,
-                    right: 10,
-                    bottom: 50, // 하단 시간 축을 위한 충분한 여백 (minimumHeight와 함께 사용)
-                    left: 10,
-                },
             },
             grid: {
                 vertLines: { color: gridColor },
@@ -532,10 +529,6 @@ export default function AssetChart() {
                     price: true,
                 },
                 axisDoubleClickReset: {
-                    time: true,
-                    price: true,
-                },
-                axisTouchDrag: {
                     time: true,
                     price: true,
                 },

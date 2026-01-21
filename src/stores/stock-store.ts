@@ -68,7 +68,7 @@ interface StockState {
     fetchNews: () => Promise<void>;
     searchStocks: (keyword: string) => Promise<void>;
     fetchQuote: (ticker: string) => Promise<void>;
-    fetchCandles: (ticker: string, timeframe?: string) => Promise<void>;
+    fetchCandles: (ticker: string, timeframe?: string) => Promise<CandlesResponse | void>;
     fetchOrderbook: (ticker: string) => Promise<void>;
     loadWatchlist: () => Promise<void>;
     addToWatchlist: (ticker: string) => Promise<void>;
@@ -76,6 +76,8 @@ interface StockState {
     updateIndices: (indices: MarketIndicesResponse) => void;
     updateQuoteFromWebSocket: (ticker: string, price: number, volume: number, timestamp: number) => void;
     updateQuoteFromWebSocketMessage: (ticker: string, messageData: any) => void;
+    addRealtimeTrade: (ticker: string, price: number, volume: number, timestamp: number) => void;
+    clearRealtimeTrades: (ticker: string) => void;
 
     // Global Selection
     selectedTicker: string;
@@ -181,7 +183,6 @@ export const useStockStore = create<StockState>()(
                         open: newOpen,
                         high: newHigh,
                         low: newLow,
-                        close: price,
                         change,
                         changePercent,
                         volume: newVolume,
@@ -218,7 +219,6 @@ export const useStockStore = create<StockState>()(
                             open: messageData.open !== undefined ? messageData.open : state.currentQuote.open,
                             high: messageData.high !== undefined ? messageData.high : state.currentQuote.high,
                             low: messageData.low !== undefined ? messageData.low : state.currentQuote.low,
-                            close: messageData.close !== undefined ? messageData.close : (messageData.price || state.currentQuote.price),
                             previousClose: messageData.previousClose !== undefined ? messageData.previousClose : state.currentQuote.previousClose,
                             change: messageData.change !== undefined ? messageData.change : state.currentQuote.change,
                             changePercent: messageData.changePercent !== undefined ? messageData.changePercent : state.currentQuote.changePercent,
@@ -277,7 +277,6 @@ export const useStockStore = create<StockState>()(
                             open: newOpen,
                             high: newHigh,
                             low: newLow,
-                            close: price,
                             change,
                             changePercent,
                             volume: newVolume,

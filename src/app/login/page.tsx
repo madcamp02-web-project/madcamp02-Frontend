@@ -9,7 +9,7 @@ import { useAuthStore } from "@/stores/auth-store";
 import { hasCompletedOnboarding } from "@/lib/utils";
 
 // Backend URL for Option A (Redirection)
-const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://madcampbackend.royaljellynas.org';
 
 // Kakao 및 Google SDK 타입 선언
 declare global {
@@ -183,9 +183,9 @@ export default function LoginPage() {
                     },
                 });
 
-                // 직접 로그인 트리거
-                window.google!.accounts.id.prompt((notification) => {
-                    if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+                // 직접 로그인 트리거 (타입 정의 상 콜백 미지원 → any로 우회)
+                (window as any).google.accounts.id.prompt((notification: any) => {
+                    if (notification?.isNotDisplayed?.() || notification?.isSkippedMoment?.()) {
                         // 팝업이 표시되지 않으면 Backend Redirect 방식으로 fallback
                         window.location.href = `${BACKEND_URL}/oauth2/authorization/google`;
                         setIsLoading(false);

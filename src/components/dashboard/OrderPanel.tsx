@@ -73,7 +73,7 @@ export default function OrderPanel({ ticker: tickerProp }: OrderPanelProps) {
         }
 
         // 매도 시 보유 수량 확인
-        if (tab === 'sell' && qty > maxSellQty) {
+        if (tab === 'sell' && Number(qty) > maxSellQty) {
             alert('보유 수량이 부족합니다.');
             return;
         }

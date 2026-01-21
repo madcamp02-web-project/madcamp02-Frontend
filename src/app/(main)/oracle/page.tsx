@@ -39,9 +39,9 @@ export default function OraclePage() {
         try {
             // Context Injection
             let contextMessage = userText;
-            const birthInfo = profile.birthDate ? `${profile.birthDate} ${profile.birthTime || "00:00"}` : "정보 없음";
+            const birthInfo = profile?.birthDate ? `${profile.birthDate} ${profile.birthTime || "00:00"}` : "정보 없음";
 
-            if (profile.birthDate) {
+            if (profile?.birthDate) {
                 contextMessage = `[시스템 정보: 사용자 생년월일=${birthInfo}] ${userText}`;
             }
 

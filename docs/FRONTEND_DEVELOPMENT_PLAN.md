@@ -1,6 +1,6 @@
 # 🎨 MadCamp02: 프론트엔드 개발 계획서
 
-**Ver 2.7.24 - Frontend Development Blueprint (Spec-Driven Alignment)**
+**Ver 2.7.26 - Frontend Development Blueprint (Spec-Driven Alignment)**
 
 ---
 
@@ -36,6 +36,8 @@
 | **2.7.24** | **2026-01-21** | **페르소나 시스템 및 금융 데이터 통합 최종 정합성 확인 및 문서 일관성 수정** | **MadCamp02** |
 | **2.7.23** | **2026-01-21** | **페르소나 시스템 및 금융 데이터 통합 반영: 페르소나 선택 UI, chat-store 확장, 금융 데이터 통합 기능 추가** | **MadCamp02** |
 | **2.7.24** | **2026-01-21** | **페르소나 시스템 및 금융 데이터 통합 최종 정합성 확인 및 문서 일관성 수정** | **MadCamp02** |
+| **2.7.25** | **2026-01-21** | **도메인 정규화: 프론트(`http://madcamp.royaljellynas.org/`)·AI 서버(`http://madcampbackend.royaljellynas.org/`) 주소로 교체 및 문서 반영** | **MadCamp02** |
+| **2.7.26** | **2026-01-21** | **도메인 최종 반영: 프론트(`http://madcamp.royaljellynas.org/`)·AI 서버(`http://madcampbackend.royaljellynas.org/`)로 전체 치환** | **MadCamp02** |
 
 ### Ver 2.6 주요 변경 사항
 
@@ -287,7 +289,7 @@ src/
 - **상점/가챠 `/shop`(+`/gacha`)**: `gameApi.getItems/gacha/getInventory/equip`로 실데이터 연동. 카테고리 ENUM(`NAMEPLATE|AVATAR|THEME`)을 그대로 사용.
 - **랭킹 `/ranking`**: `gameApi.getRanking` 호출로 Top 리스트/내 랭킹 로딩. `user-store`의 `isRankingJoined` 상태와 연계.
 - **마이페이지 `/mypage`**: 프로필/인벤토리/지갑/랭킹 참여 토글 모두 `userApi`/`gameApi` 실 호출로 동작. 공개/랭킹참여 토글은 `userApi.updateProfile`을 통해 서버 반영.
-- **AI 도사 `/oracle`**: `lib/api/ai.ts`가 FastAPI(`http://localhost:8000`)에 POST 호출하여 응답을 받음. SSE 스트리밍은 아직 미구현.
+- **AI 도사 `/oracle`**: `lib/api/ai.ts`가 FastAPI(`http://madcampbackend.royaljellynas.org/`)에 POST 호출하여 응답을 받음. SSE 스트리밍은 아직 미구현.
 - **온보딩 `/onboarding`**: UI가 `nickname/birthDate/birthTime/gender/calendarType` 필드 모두 입력 받고 `userApi.submitOnboarding`(POST `/api/v1/user/onboarding`)을 호출. 응답의 `saju` 필드 기반 결과 표시(없으면 기본값). 마이페이지에서 동일 DTO를 사용해 재온보딩(사주 재계산)도 수행한다.
 - **계산기 `/calculator`**: 배당/세금 계산 폼을 표시하고, 사용자가 입력한 배당 수익률/주당 배당액/세율을 `calcApi.getDividend/getTax`를 통해 백엔드 Calc API와 연동한다. Currency는 현재 `null`로 내려오며, 화면에서는 USD 기준 값으로만 표시한다.
 - **인증**:
@@ -605,7 +607,7 @@ Zustand를 사용하여 전역 상태를 효율적으로 관리하고 컴포넌�
 - **Response DTO 규약(중요)**: `docs/FULL_SPECIFICATION.md`의 `5.0 공통 응답 규약 (Phase 0: Interface Freeze)`를 단일 진실로 사용
   - **리스트 응답**: 기본적으로 `{ "items": [...] }` 형태 (향후 `asOf`, `nextCursor` 확장 대비)
   - **에러 응답**: `ErrorResponse` (`timestamp/status/error/message`)
-- **Base URL**: 환경 변수 `NEXT_PUBLIC_API_URL` (예: `http://localhost:8080`)
+- **Base URL**: 환경 변수 `NEXT_PUBLIC_API_URL` (예: `http://madcampbackend.royaljellynas.org`)
 - **Interceptors**:
   - **Request**: `Authorization` 헤더에 Bearer Token 자동 주입.
   - **Response**: 401 Unauthorized 발생 시 토큰 갱신 시도 또는 로그아웃 처리.
@@ -795,7 +797,7 @@ flowchart TD
 
 ---
 
-**문서 버전:** 2.7.24 (페르소나 시스템 및 금융 데이터 통합 반영)  
+**문서 버전:** 2.7.26 (도메인 최종 반영)  
 **최종 수정일:** 2026-01-21
 
 ### 수정 요약 (2026-01-21)
@@ -803,6 +805,7 @@ flowchart TD
 - 페르소나 시스템 및 금융 데이터 통합 관련 내용 추가
 - AI 도사(`/oracle`) 페이지에 금융 데이터 통합 기능 반영
 - 관련 문서 링크 추가
+- 배포 도메인(`royaljellynas.org`) 기준으로 프론트/AI 서버 주소 전체 치환
 
 ## 관련 문서
 

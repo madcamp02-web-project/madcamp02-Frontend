@@ -104,20 +104,7 @@ export default function TradeChart({ ticker, timeframe = 'd' }: TradeChartProps)
             
             // 차트가 이미 초기화되어 있으면 데이터 업데이트
             if (seriesRef.current && chartRef.current) {
-                // timeframe에 따라 캔들 크기 업데이트
-                const getCandleWidth = (tf: string): number => {
-                    switch (tf) {
-                        case 'd': return 2; // 일봉: 얇은 캔들
-                        case 'w': return 4; // 주봉: 중간 캔들
-                        case 'm': return 6; // 월봉: 두꺼운 캔들
-                        default: return 2;
-                    }
-                };
-                
                 seriesRef.current.setData(convertedData);
-                seriesRef.current.applyOptions({
-                    priceLineWidth: getCandleWidth(timeframe),
-                });
                 
                 // 최신 데이터 중심으로 보이도록 설정
                 if (convertedData.length > 0) {
@@ -162,7 +149,7 @@ export default function TradeChart({ ticker, timeframe = 'd' }: TradeChartProps)
                     }
                 }, 100);
                 
-                console.log('[TradeChart] 차트 데이터 업데이트 완료:', convertedData.length, '개 데이터, 캔들 크기:', getCandleWidth(timeframe));
+                console.log('[TradeChart] 차트 데이터 업데이트 완료:', convertedData.length, '개 데이터');
             }
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -216,6 +203,8 @@ export default function TradeChart({ ticker, timeframe = 'd' }: TradeChartProps)
         });
 
         // 집계된 캔들을 차트에 추가/업데이트
+        if (!seriesRef.current || !chartRef.current) return;
+
         candleMap.forEach((candleData, candleTime) => {
             const candle: CandlestickData<Time> = {
                 time: candleTime as Time,
@@ -230,7 +219,7 @@ export default function TradeChart({ ticker, timeframe = 'd' }: TradeChartProps)
 
             try {
                 // 차트에 업데이트 (이미 있으면 업데이트, 없으면 추가)
-                seriesRef.current.update(candle);
+                seriesRef.current!.update(candle);
                 
                 // 마지막 캔들 참조 업데이트
                 if (!lastCandleRef.current || 
@@ -239,7 +228,7 @@ export default function TradeChart({ ticker, timeframe = 'd' }: TradeChartProps)
                 }
 
                 // 최신 데이터가 보이도록 스크롤
-                chartRef.current.timeScale().scrollToPosition(1, false);
+                chartRef.current!.timeScale().scrollToPosition(1, false);
             } catch (error) {
                 console.error('[TradeChart] 실시간 캔들 업데이트 실패:', error);
             }
@@ -308,13 +297,7 @@ export default function TradeChart({ ticker, timeframe = 'd' }: TradeChartProps)
             layout: {
                 background: { type: ColorType.Solid, color: 'transparent' },
                 textColor: textColor,
-                // 하단 시간 축이 잘리지 않도록 여백 추가
-                padding: {
-                    top: 10,
-                    right: 10,
-                    bottom: 50, // 하단 시간 축을 위한 충분한 여백 (minimumHeight와 함께 사용)
-                    left: 10,
-                },
+                // 하단 시간 축 여백은 timeScale.minimumHeight와 컨테이너 CSS로 처리
             },
             grid: {
                 vertLines: { color: gridColor },
@@ -371,27 +354,12 @@ export default function TradeChart({ ticker, timeframe = 'd' }: TradeChartProps)
                     time: true,
                     price: true,
                 },
-                axisTouchDrag: {
-                    time: true,
-                    price: true,
-                },
                 mouseWheel: true,
                 pinch: true,
             },
         });
 
         // 캔들스틱 시리즈 추가
-        // timeframe에 따라 캔들 크기 조정
-        // 각 기간별로 명확하게 구분되도록 크기 차이를 크게 설정
-        const getCandleWidth = (tf: string): number => {
-            switch (tf) {
-                case 'd': return 2; // 일봉: 얇은 캔들
-                case 'w': return 4; // 주봉: 중간 캔들
-                case 'm': return 6; // 월봉: 두꺼운 캔들
-                default: return 2;
-            }
-        };
-        
         const candlestickSeries = chart.addSeries(CandlestickSeries, {
             upColor: '#ef4444',      // 빨간색 (상승)
             downColor: '#266bcaff',  // 파란색 (하락)
@@ -399,7 +367,8 @@ export default function TradeChart({ ticker, timeframe = 'd' }: TradeChartProps)
             borderDownColor: '#266bcaff',
             wickUpColor: '#ef4444',
             wickDownColor: '#266bcaff',
-            priceLineWidth: getCandleWidth(timeframe), // timeframe에 따른 캔들 두께
+            // priceLineWidth는 타입 정의가 엄격하여 number 직접 지정 시 빌드가 깨질 수 있음
+            // 기본 두께를 사용해도 캔들 색/형태는 동일하며 UI는 손상되지 않음
         });
 
         chartRef.current = chart;
@@ -478,7 +447,11 @@ export default function TradeChart({ ticker, timeframe = 'd' }: TradeChartProps)
             if (currentSeriesData && currentSeriesData.length === chartData.length) {
                 const currentLast = currentSeriesData[currentSeriesData.length - 1];
                 const newLast = chartData[chartData.length - 1];
-                if (currentLast?.time === newLast?.time && currentLast?.close === newLast?.close) {
+                if (
+                    currentLast?.time === newLast?.time &&
+                    'close' in (currentLast as any) &&
+                    (currentLast as any).close === newLast?.close
+                ) {
                     console.log('[TradeChart] 차트 데이터가 이미 동일하므로 업데이트 스킵');
                     return;
                 }

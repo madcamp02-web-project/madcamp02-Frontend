@@ -2,7 +2,7 @@ import { Client, IMessage } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
 import { useAuthStore } from '@/stores/auth-store';
 
-const WS_URL = process.env.NEXT_PUBLIC_WS_URL || 'http://localhost:8080';
+const WS_URL = process.env.NEXT_PUBLIC_WS_URL || 'http://madcampbackend.royaljellynas.org';
 
 class SocketClient {
     private client: Client;
@@ -13,6 +13,15 @@ class SocketClient {
     private connectReject: ((error: Error) => void) | null = null;
 
     constructor() {
+        const getConnectHeaders = (): { [key: string]: string } => {
+            const token = useAuthStore.getState().token;
+            const headers: { [key: string]: string } = {};
+            if (token) {
+                headers.Authorization = `Bearer ${token}`;
+            }
+            return headers;
+        };
+
         this.client = new Client({
             // WebSocket 엔드포인트 (문서 10.2 기준: /ws-stomp)
             webSocketFactory: () => new SockJS(`${WS_URL}/ws-stomp`),
@@ -21,11 +30,8 @@ class SocketClient {
                     console.log('[STOMP]:', str);
                 }
             },
-            connectHeaders: () => {
-                // 인증 토큰 헤더 추가
-                const token = useAuthStore.getState().token;
-                return token ? { Authorization: `Bearer ${token}` } : {};
-            },
+            // 초기 연결 시점의 토큰을 사용하고, 재연결 시에는 activate() 전에 토큰이 갱신되었다고 가정
+            connectHeaders: getConnectHeaders(),
             onConnect: () => {
                 console.log('[STOMP] Connected');
                 this.connected = true;
