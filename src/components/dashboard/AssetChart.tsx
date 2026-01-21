@@ -50,9 +50,13 @@ export default function AssetChart() {
         updateQuoteFromWebSocketMessage,
         addRealtimeTrade,
         realtimeTrades,
+        selectedTicker,
+        setSelectedTicker,
+        watchlist,
+        addToWatchlist,
+        removeFromWatchlist,
     } = useStockStore();
 
-    const [selectedTicker, setSelectedTicker] = useState<string>('AAPL');
     const [timeframe, setTimeframe] = useState<string>('d'); // 기본값: d (일봉)
     const [timeframeError, setTimeframeError] = useState<string | null>(null); // timeframe 에러 추적
     const [searchKeyword, setSearchKeyword] = useState<string>('');
@@ -543,15 +547,7 @@ export default function AssetChart() {
         // v5 API: use addSeries with CandlestickSeries
         // timeframe에 따라 캔들 크기 조정
         // 각 기간별로 명확하게 구분되도록 크기 차이를 크게 설정
-        const getCandleWidth = (tf: string): number => {
-            switch (tf) {
-                case 'd': return 2; // 일봉: 얇은 캔들
-                case 'w': return 4; // 주봉: 중간 캔들
-                case 'm': return 6; // 월봉: 두꺼운 캔들
-                case 'all': return 2; // 전체: 일봉과 동일한 크기
-                default: return 2;
-            }
-        };
+
 
         const candlestickSeries = chart.addSeries(CandlestickSeries, {
             upColor: '#ef4444',
@@ -560,7 +556,7 @@ export default function AssetChart() {
             borderDownColor: '#266bcaff',
             wickUpColor: '#ef4444',
             wickDownColor: '#266bcaff',
-            priceLineWidth: getCandleWidth(timeframe), // timeframe에 따른 캔들 두께
+            priceLineWidth: 2, // 일봉 기준(2)으로 통일 (점선 크기 고정)
         });
 
         chartRef.current = chart;
@@ -652,11 +648,36 @@ export default function AssetChart() {
     useEffect(() => {
         if (seriesRef.current && chartData.length > 0 && chartRef.current) {
             try {
-                seriesRef.current.setData(chartData);
+                // currentQuote가 있고 chartData의 마지막 데이터보다 최신이거나 가격이 다르면 추가
+                let finalChartData = [...chartData];
+                if (currentQuote && currentQuote.ticker === selectedTicker) {
+                    const lastCandle = chartData[chartData.length - 1];
+                    const lastTime = typeof lastCandle.time === 'number' ? lastCandle.time : new Date(lastCandle.time as string).getTime() / 1000;
+
+                    // 현재가 캔들 생성
+                    // DB 데이터가 과거인 경우 현재가로 캔들을 만들어 이어붙임
+                    // 단, 이미 오늘 날짜의 캔들이 있으면 업데이트 (여기서는 단순히 append 처리로 시각적 연결)
+                    const now = Math.floor(Date.now() / 1000);
+
+                    // 마지막 캔들로부터 1일 이상 차이나면 새로운 캔들 추가
+                    if (now - lastTime > 86400 || Math.abs(lastCandle.close - currentQuote.price) > 0.01) {
+                        const currentCandle: CandlestickData<Time> = {
+                            time: now as Time,
+                            open: currentQuote.open || currentQuote.price,
+                            high: currentQuote.high || currentQuote.price,
+                            low: currentQuote.low || currentQuote.price,
+                            close: currentQuote.price,
+                        };
+                        finalChartData.push(currentCandle);
+                        console.log('[AssetChart] 현재가 캔들 추가:', currentCandle);
+                    }
+                }
+
+                seriesRef.current.setData(finalChartData);
 
                 // 최신 데이터 중심으로 보이도록 설정
-                const firstTime = chartData[0].time;
-                const lastTime = chartData[chartData.length - 1].time;
+                const firstTime = finalChartData[0].time;
+                const lastTime = finalChartData[finalChartData.length - 1].time;
                 const firstTimeValue = typeof firstTime === 'number' ? firstTime : new Date(firstTime as string).getTime() / 1000;
                 const lastTimeValue = typeof lastTime === 'number' ? lastTime : new Date(lastTime as string).getTime() / 1000;
 
@@ -732,7 +753,7 @@ export default function AssetChart() {
     }, [theme]);
 
     return (
-        <WidgetCard className="min-h-[350px] flex flex-col">
+        <WidgetCard className="min-h-[350px] flex flex-col" allowOverflow={true}>
             {/* 1. Header Row: Stock Info + Search */}
             <div className="flex justify-between items-center mb-4">
                 <div className="flex items-center gap-3">
@@ -745,6 +766,25 @@ export default function AssetChart() {
                             )}
                         </div>
                     )}
+
+                    {/* Watchlist Toggle */}
+                    <button
+                        onClick={() => {
+                            if (watchlist.includes(selectedTicker)) {
+                                removeFromWatchlist(selectedTicker);
+                            } else {
+                                addToWatchlist(selectedTicker);
+                            }
+                        }}
+                        className="p-1.5 rounded-full hover:bg-secondary/80 transition-colors ml-1"
+                        title={watchlist.includes(selectedTicker) ? "관심종목 제거" : "관심종목 추가"}
+                    >
+                        {watchlist.includes(selectedTicker) ? (
+                            <span className="text-yellow-500 text-xl">★</span>
+                        ) : (
+                            <span className="text-muted-foreground hover:text-yellow-500 text-xl">☆</span>
+                        )}
+                    </button>
                 </div>
 
                 {/* Search Bar Input */}
@@ -779,12 +819,12 @@ export default function AssetChart() {
                         <div className="absolute top-full left-0 right-0 mt-1 bg-background border border-border rounded-lg shadow-lg z-50 max-h-60 overflow-y-auto">
                             {searchResults.items.slice(0, 5).map((stock) => (
                                 <button
-                                    key={stock.ticker}
-                                    onClick={() => handleSelectStock(stock.ticker)}
+                                    key={stock.symbol}
+                                    onClick={() => handleSelectStock(stock.symbol)}
                                     className="w-full px-4 py-2 text-left hover:bg-secondary transition-colors flex items-center justify-between"
                                 >
                                     <div>
-                                        <div className="text-sm font-medium text-foreground">{stock.ticker}</div>
+                                        <div className="text-sm font-medium text-foreground">{stock.symbol}</div>
                                         {stock.name && (
                                             <div className="text-xs text-muted-foreground">{stock.name}</div>
                                         )}

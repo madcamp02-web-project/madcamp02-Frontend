@@ -16,22 +16,22 @@ const formatTime = (dateString: string) => {
 export default function TradePage() {
   const [searchKeyword, setSearchKeyword] = useState('');
   const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
-    const [timeframe, setTimeframe] = useState<string>('d'); // 기본값: d (일봉)
+  const [timeframe, setTimeframe] = useState<string>('d'); // 기본값: d (일봉)
   const [orderMode, setOrderMode] = useState<'buy' | 'sell'>('buy');
   const [priceType, setPriceType] = useState<'market' | 'limit'>('market');
   const [quantity, setQuantity] = useState('');
 
-  const { 
-    watchlist, 
-    orderbook, 
-    currentQuote, 
+  const {
+    watchlist,
+    orderbook,
+    currentQuote,
     candles,
     searchResults,
     prices,
     isLoading,
     error,
-    loadWatchlist, 
-    fetchOrderbook, 
+    loadWatchlist,
+    fetchOrderbook,
     fetchQuote,
     fetchCandles,
     searchStocks,
@@ -43,8 +43,8 @@ export default function TradePage() {
     addRealtimeTrade,
   } = useStockStore();
 
-  const { 
-    transactions, 
+  const {
+    transactions,
     availableBalance,
     fetchAvailableBalance,
     fetchHistory,
@@ -52,9 +52,9 @@ export default function TradePage() {
 
   // 초기 로드
   useEffect(() => {
-    loadWatchlist().catch(() => {});
-    fetchAvailableBalance().catch(() => {});
-    fetchHistory().catch(() => {});
+    loadWatchlist().catch(() => { });
+    fetchAvailableBalance().catch(() => { });
+    fetchHistory().catch(() => { });
   }, [loadWatchlist, fetchAvailableBalance, fetchHistory]);
 
   // 관심종목 목록이 로드되면 WebSocket 구독만 설정
@@ -67,20 +67,20 @@ export default function TradePage() {
   useEffect(() => {
     if (selectedTicker) {
       console.log(`[TradePage] 종목 선택됨: ${selectedTicker}`);
-      
+
       // 호가 데이터는 API로 가져오기 (WebSocket으로는 실시간 업데이트 안 됨)
       // 에러는 store에서 조용히 처리하므로 여기서는 별도 처리 불필요
       fetchOrderbook(selectedTicker).catch(() => {
         // 조용히 실패 처리 (store에서 이미 처리됨)
       });
-      
+
       // 차트 데이터는 API로 가져오기
       fetchCandles(selectedTicker, timeframe).then((result) => {
         console.log(`[TradePage] fetchCandles 성공 (${timeframe}):`, result);
       }).catch((err) => {
         console.error('[TradePage] fetchCandles failed:', err);
       });
-      
+
       // 가격 정보는 WebSocket으로 수신하므로 초기 API 호출은 선택적
       // WebSocket 구독이 이미 설정되어 있으면 백엔드가 자동으로 Quote 데이터 브로드캐스트
       // 초기 표시를 위해 한 번만 호출 (캐시된 데이터가 있으면 사용)
@@ -116,10 +116,10 @@ export default function TradePage() {
           try {
             const data = JSON.parse(message.body);
             console.log(`[TradePage] WebSocket 실시간 데이터 수신 (${ticker}):`, data);
-            
+
             const messageTicker = data.ticker || ticker;
             const rawType = data.rawType || 'trade'; // "trade" 또는 "quote"
-            
+
             // Quote 메시지 처리 (백엔드 Quote API 폴링 데이터 - 5초마다)
             // 백엔드 StockQuoteBroadcastService가 활성 구독 종목의 OHLC 데이터를 브로드캐스트
             if (rawType === 'quote') {
@@ -133,27 +133,27 @@ export default function TradePage() {
                 changePercent: data.changePercent,
                 volume: data.volume,
               });
-              
+
               // Quote 메시지의 모든 필드를 currentQuote에 반영 (선택된 종목인 경우)
               // prices에도 반영하여 관심종목 목록에 표시
               updateQuoteFromWebSocketMessage(messageTicker, data);
-            } 
+            }
             // Trade 메시지 처리 (실시간 체결 데이터)
             // 백엔드 TradePriceBroadcastService가 Finnhub WebSocket trade 메시지를 브로드캐스트
             else {
               const price = data.price || data.close || 0;
               const volume = data.volume || 0;
               const timestamp = data.ts || Date.now();
-              
+
               // 실시간 trade 데이터가 있으면 차트용으로 저장
               if (volume > 0) {
                 addRealtimeTrade(messageTicker, price, volume, timestamp);
               }
-              
+
               // currentQuote 업데이트 (선택된 종목인 경우)
               // prices도 업데이트하여 관심종목 목록에 실시간 반영
               updateQuoteFromWebSocket(messageTicker, price, volume, timestamp);
-              
+
               // prices 업데이트 (관심종목 목록 표시용)
               updatePrice({
                 ticker: messageTicker,
@@ -168,7 +168,7 @@ export default function TradePage() {
             console.error(`[TradePage] Failed to parse WebSocket message for ${ticker}:`, error);
           }
         });
-        
+
         if (subscription) {
           subscriptions.push({ ticker, subscription });
         }
@@ -198,42 +198,42 @@ export default function TradePage() {
   const handleSearch = async (keyword: string) => {
     setSearchKeyword(keyword);
     if (keyword.trim()) {
-      await searchStocks(keyword).catch(() => {});
+      await searchStocks(keyword).catch(() => { });
     } else {
       // 검색어가 비어있으면 검색 결과 초기화
       // searchResults는 store에서 관리되므로 별도 초기화 불필요
     }
   };
-  
+
   // 종목 선택 시 검색 결과에서 종목명 가져오기
   useEffect(() => {
     if (selectedTicker && !searchResults) {
       // 종목이 선택되었는데 검색 결과가 없으면 검색 시도 (종목명 가져오기)
-      searchStocks(selectedTicker).catch(() => {});
+      searchStocks(selectedTicker).catch(() => { });
     }
   }, [selectedTicker, searchResults, searchStocks]);
 
   // 관심종목 추가/삭제
   const handleToggleWatchlist = async (ticker: string, isInWatchlist: boolean) => {
     if (isInWatchlist) {
-      await removeFromWatchlist(ticker).catch(() => {});
+      await removeFromWatchlist(ticker).catch(() => { });
     } else {
-      await addToWatchlist(ticker).catch(() => {});
+      await addToWatchlist(ticker).catch(() => { });
     }
   };
 
   // 현재 선택된 종목 정보 (실시간 업데이트 반영)
   const selectedStock = useMemo(() => {
     if (!selectedTicker) return null;
-    
+
     // currentQuote가 있으면 우선 사용 (실시간 업데이트 반영)
     // 없으면 prices에서 가져오기
-    const priceData = currentQuote && currentQuote.ticker === selectedTicker 
-      ? currentQuote 
+    const priceData = currentQuote && currentQuote.ticker === selectedTicker
+      ? currentQuote
       : prices[selectedTicker];
-    
+
     if (!priceData) return null;
-    
+
     // 종목명 찾기: searchResults에서 찾거나 currentQuote의 ticker 사용
     let stockName = selectedTicker;
     if (searchResults?.items) {
@@ -242,7 +242,7 @@ export default function TradePage() {
         stockName = found.name;
       }
     }
-    
+
     return {
       ticker: selectedTicker,
       name: stockName,
@@ -258,20 +258,20 @@ export default function TradePage() {
       // prices에서 가격 정보 가져오기 (WebSocket으로 실시간 업데이트됨)
       // 백엔드 StockQuoteBroadcastService가 5초마다 Quote 데이터 브로드캐스트
       const price = prices[ticker];
-      
+
       // 가격 정보가 없으면 currentQuote 확인 (선택된 종목인 경우)
       let priceValue = price?.price;
       let changePercent = price?.changePercent ?? 0;
-      
+
       // prices에 데이터가 없고, 선택된 종목이면 currentQuote 사용
       if ((priceValue === undefined || priceValue === 0) && currentQuote && currentQuote.ticker === ticker) {
         priceValue = currentQuote.price;
         changePercent = currentQuote.changePercent ?? 0;
       }
-      
+
       // 가격 정보가 있으면 표시, 없으면 기본값 표시 (WebSocket 데이터 대기)
       const hasPrice = priceValue !== undefined && priceValue !== null && priceValue > 0;
-      
+
       return {
         ticker,
         name: ticker, // API에서 이름을 가져올 수 있으면 추가
@@ -285,7 +285,7 @@ export default function TradePage() {
   // Combine and sort trades
   const recentTrades = useMemo(() => {
     if (!selectedTicker) return [];
-    
+
     const userTrades = [...transactions]
       .filter(t => t.ticker === selectedTicker)
       .sort((a, b) => new Date(b.tradeDate).getTime() - new Date(a.tradeDate).getTime())
@@ -322,7 +322,7 @@ export default function TradePage() {
           <div className="text-right">
             <span className="text-muted-foreground text-sm">매수가능금액</span>
             <div className="text-xl font-bold text-foreground">
-              {availableBalance !== null 
+              {availableBalance !== null
                 ? `$${availableBalance.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
                 : '로딩 중...'}
             </div>
@@ -395,8 +395,8 @@ export default function TradePage() {
                   </div>
                   <div className="text-right">
                     <div className="text-foreground font-bold text-sm">
-                      ${stock.price !== null && stock.price > 0 
-                        ? stock.price.toLocaleString(undefined, { maximumFractionDigits: 2 }) 
+                      ${stock.price !== null && stock.price > 0
+                        ? stock.price.toLocaleString(undefined, { maximumFractionDigits: 2 })
                         : '--'}
                     </div>
                     <div className={`text-xs ${stock.change?.startsWith('+') ? 'text-green-500' : stock.change?.startsWith('-') ? 'text-red-500' : 'text-muted-foreground'}`}>
@@ -491,8 +491,8 @@ export default function TradePage() {
               <div>
                 <span className="text-muted-foreground">거래량(Vol)</span>
                 <span className="text-foreground font-semibold ml-2">
-                  {currentQuote?.volume !== undefined && currentQuote.volume > 0 
-                    ? currentQuote.volume.toLocaleString() 
+                  {currentQuote?.volume !== undefined && currentQuote.volume > 0
+                    ? currentQuote.volume.toLocaleString()
                     : '--'}
                 </span>
               </div>
@@ -517,11 +517,10 @@ export default function TradePage() {
                         setTimeframe(tab.value);
                         // timeframe 변경 시 useEffect가 자동으로 fetchCandles 호출하므로 중복 호출 제거
                       }}
-                      className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
-                        timeframe === tab.value 
-                          ? 'bg-green-500/20 text-green-400' 
+                      className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${timeframe === tab.value
+                          ? 'bg-green-500/20 text-green-400'
                           : 'text-muted-foreground hover:text-foreground'
-                      }`}
+                        }`}
                     >
                       {tab.label}
                     </button>
@@ -529,8 +528,8 @@ export default function TradePage() {
                 </div>
               </div>
               {selectedTicker ? (
-                <TradeChart 
-                  ticker={selectedTicker} 
+                <TradeChart
+                  ticker={selectedTicker}
                   timeframe={timeframe}
                 />
               ) : (

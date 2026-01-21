@@ -5,10 +5,10 @@ import WidgetCard from './WidgetCard';
 import { useStockStore } from '@/stores/stock-store';
 
 export default function Watchlist() {
-    const { watchlist, prices, loadWatchlist } = useStockStore();
+    const { watchlist, prices, loadWatchlist, setSelectedTicker } = useStockStore();
 
     useEffect(() => {
-        loadWatchlist().catch(() => {});
+        loadWatchlist().catch(() => { });
     }, [loadWatchlist]);
 
     const stocks = watchlist.map(ticker => {
@@ -28,7 +28,7 @@ export default function Watchlist() {
         <WidgetCard title="관심 종목" action={<span className="text-yellow-500">★</span>} className="h-full">
             <div className="flex flex-col gap-3">
                 {stocks.map((stock) => (
-                    <div key={stock.t} className="flex justify-between items-center p-3 rounded-lg bg-secondary/50 hover:bg-secondary cursor-pointer border border-transparent hover:border-border group transition-all">
+                    <div key={stock.t} onClick={() => setSelectedTicker(stock.t)} className="flex justify-between items-center p-3 rounded-lg bg-secondary/50 hover:bg-secondary cursor-pointer border border-transparent hover:border-border group transition-all">
                         <div className="flex items-center gap-3">
                             {/* Arrow Icon Circle */}
                             <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${stock.up ? 'bg-green-500/20 text-green-500' : 'bg-red-500/20 text-red-500'}`}>

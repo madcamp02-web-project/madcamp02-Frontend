@@ -8,16 +8,41 @@ export default function RecentTrades() {
     const { transactions, fetchHistory } = usePortfolioStore();
 
     React.useEffect(() => {
-        fetchHistory().catch(() => {});
+        fetchHistory().catch(() => { });
     }, [fetchHistory]);
+
+    // Java LocalDateTime 배열 형식 변환: [년, 월, 일, 시, 분, 초, 나노초]
+    const parseTradeDate = (tradeDate: unknown): Date | null => {
+        if (!tradeDate) return null;
+        if (Array.isArray(tradeDate) && tradeDate.length >= 6) {
+            return new Date(
+                tradeDate[0], // year
+                tradeDate[1] - 1, // month (0-indexed)
+                tradeDate[2], // day
+                tradeDate[3], // hour
+                tradeDate[4], // minute
+                tradeDate[5], // second
+                Math.floor((tradeDate[6] || 0) / 1000000) // milliseconds
+            );
+        }
+        // 문자열인 경우 그대로 파싱
+        const date = new Date(tradeDate as string);
+        return isNaN(date.getTime()) ? null : date;
+    };
 
     // Sort by tradeDate descending
     const sortedTrades = [...transactions]
-        .sort((a, b) => new Date(b.tradeDate).getTime() - new Date(a.tradeDate).getTime())
+        .sort((a, b) => {
+            const dateA = parseTradeDate(a.tradeDate);
+            const dateB = parseTradeDate(b.tradeDate);
+            return (dateB?.getTime() || 0) - (dateA?.getTime() || 0);
+        })
         .slice(0, 10);
 
-    const formatTime = (dateString: string) => {
-        return new Date(dateString).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    const formatTime = (tradeDate: unknown) => {
+        const date = parseTradeDate(tradeDate);
+        if (!date) return '-';
+        return date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
     };
 
     return (

@@ -2,27 +2,24 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { usePortfolioStore } from '@/stores/portfolio-store';
-import { useStockStore } from '@/stores/stock-store';
+
 
 export default function PortfolioPage() {
-    const [chartPeriod, setChartPeriod] = useState<'1w' | '1m' | '3m' | '1y'>('1m');
-    const [selectedCard, setSelectedCard] = useState<'total' | 'invested' | 'evaluation' | 'profit'>('total');
     const [tableTab, setTableTab] = useState<'holdings' | 'history'>('holdings');
 
-    const { 
-        summary, 
-        positions, 
-        transactions, 
+    const {
+        summary,
+        positions,
+        transactions,
         isLoading,
-        fetchPortfolio, 
-        fetchHistory 
+        fetchPortfolio,
+        fetchHistory
     } = usePortfolioStore();
-    const { prices } = useStockStore();
 
     // 초기 로드
     useEffect(() => {
-        fetchPortfolio().catch(() => {});
-        fetchHistory().catch(() => {});
+        fetchPortfolio().catch(() => { });
+        fetchHistory().catch(() => { });
     }, [fetchPortfolio, fetchHistory]);
 
     // --- Derived Data ---
@@ -94,9 +91,10 @@ export default function PortfolioPage() {
         },
     ];
 
-    const sortedTransactions = [...transactions].sort((a, b) => 
+    const sortedTransactions = [...transactions].sort((a, b) =>
         new Date(b.tradeDate).getTime() - new Date(a.tradeDate).getTime()
     );
+
 
     // Pie Chart Data - Use Normalized USD values
     const pieChartData = holdingsList.map(h => {
@@ -135,11 +133,7 @@ export default function PortfolioPage() {
                     {statsCards.map((card) => (
                         <div
                             key={card.key}
-                            onClick={() => setSelectedCard(card.key)}
-                            className={`bg-card rounded-2xl p-4 cursor-pointer transition-all duration-200 ${selectedCard === card.key
-                                ? 'border-2 border-green-500/50 shadow-[0_0_15px_rgba(34,197,94,0.2)]'
-                                : 'border border-border hover:border-muted-foreground/20 hover:bg-secondary/50'
-                                }`}
+                            className="bg-card rounded-2xl p-4 border border-border hover:border-muted-foreground/20 hover:bg-secondary/50 transition-all duration-200"
                         >
                             <div className="flex items-center gap-2 mb-2">
                                 <div className={`w-8 h-8 ${card.iconBg} rounded-full flex items-center justify-center`}>
@@ -157,81 +151,6 @@ export default function PortfolioPage() {
                     ))}
                 </div>
 
-                {/* Asset Chart Section */}
-                <div className="bg-card border border-border rounded-2xl p-4 mb-6">
-                    <div className="flex justify-between items-center mb-4">
-                        <h2 className="text-foreground font-bold text-lg">자산 추이</h2>
-                        <div className="flex gap-1 bg-secondary rounded-lg p-1">
-                            {[
-                                { key: '1w', label: '1주' },
-                                { key: '1m', label: '1개월' },
-                                { key: '3m', label: '3개월' },
-                                { key: '1y', label: '1년' },
-                            ].map((tab) => (
-                                <button
-                                    key={tab.key}
-                                    onClick={() => setChartPeriod(tab.key as typeof chartPeriod)}
-                                    className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${chartPeriod === tab.key
-                                        ? 'bg-green-500 text-white'
-                                        : 'text-muted-foreground hover:text-foreground'
-                                        }`}
-                                >
-                                    {tab.label}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                    {/* Chart Area */}
-                    <div className="h-[200px] bg-gradient-to-b from-green-500/10 to-transparent rounded-lg relative">
-                        <div className="absolute inset-0 px-4 pb-4 pt-8">
-                            <svg className="w-full h-full overflow-visible" preserveAspectRatio="none">
-                                <defs>
-                                    <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="0%" stopColor="#22C55E" stopOpacity="0.4" />
-                                        <stop offset="100%" stopColor="#22C55E" stopOpacity="0" />
-                                    </linearGradient>
-                                </defs>
-                                {/* Mock Trend Data Generation */}
-                                {(() => {
-                                    // Generate consistent-looking mock data
-                                    const points = Array.from({ length: 30 }, (_, i) => {
-                                        const x = (i / 29) * 100;
-                                        // Random walk
-                                        const y = 50 + Math.sin(i * 0.5) * 20 + (Math.random() - 0.5) * 10;
-                                        return { x, y: Math.max(10, Math.min(90, y)) };
-                                    });
-
-                                    // Create path string
-                                    const pathD = points.map((p, i) =>
-                                        `${i === 0 ? 'M' : 'L'} ${p.x}% ${100 - p.y}%`
-                                    ).join(' ');
-
-                                    const areaD = `${pathD} L 100% 100% L 0 100% Z`;
-
-                                    return (
-                                        <>
-                                            <path d={areaD} fill="url(#chartGradient)" />
-                                            <path d={pathD} fill="none" stroke="#22C55E" strokeWidth="2" vectorEffect="non-scaling-stroke" />
-                                            {/* Highlight the last point */}
-                                            <circle
-                                                cx={`${points[points.length - 1].x}%`}
-                                                cy={`${100 - points[points.length - 1].y}%`}
-                                                r="4"
-                                                fill="#22C55E"
-                                                stroke="white"
-                                                strokeWidth="2"
-                                            />
-                                        </>
-                                    );
-                                })()}
-                            </svg>
-                        </div>
-                        {/* Static Y-axis labels for demo */}
-                        <div className="absolute left-2 top-2 text-gray-500 text-xs">{(totalAsset * 1.2).toLocaleString()}</div>
-                        <div className="absolute left-2 top-1/2 text-gray-500 text-xs">{totalAsset.toLocaleString()}</div>
-                        <div className="absolute left-2 bottom-2 text-gray-500 text-xs">0</div>
-                    </div>
-                </div>
 
                 {/* Holdings Table & Pie Chart */}
                 <div className="grid grid-cols-[1.5fr_1fr] gap-4">
@@ -315,8 +234,37 @@ export default function PortfolioPage() {
                                         sortedTransactions.map((trade) => (
                                             <div key={trade.logId} className="grid grid-cols-6 gap-2 py-3 border-b border-border text-sm">
                                                 <div>
-                                                    <div className="text-foreground">{new Date(trade.tradeDate).toLocaleDateString()}</div>
-                                                    <div className="text-muted-foreground text-xs">{new Date(trade.tradeDate).toLocaleTimeString()}</div>
+                                                    {(() => {
+                                                        // Java LocalDateTime 배열 형식 변환: [년, 월, 일, 시, 분, 초, 나노초]
+                                                        const parseTradeDate = (tradeDate: any): Date | null => {
+                                                            if (!tradeDate) return null;
+                                                            if (Array.isArray(tradeDate) && tradeDate.length >= 6) {
+                                                                return new Date(
+                                                                    tradeDate[0], // year
+                                                                    tradeDate[1] - 1, // month (0-indexed)
+                                                                    tradeDate[2], // day
+                                                                    tradeDate[3], // hour
+                                                                    tradeDate[4], // minute
+                                                                    tradeDate[5], // second
+                                                                    Math.floor((tradeDate[6] || 0) / 1000000) // milliseconds
+                                                                );
+                                                            }
+                                                            // 문자열인 경우 그대로 파싱
+                                                            const date = new Date(tradeDate);
+                                                            return isNaN(date.getTime()) ? null : date;
+                                                        };
+                                                        const date = parseTradeDate(trade.tradeDate);
+                                                        return (
+                                                            <>
+                                                                <div className="text-foreground">
+                                                                    {date ? date.toLocaleDateString() : '-'}
+                                                                </div>
+                                                                <div className="text-muted-foreground text-xs">
+                                                                    {date ? date.toLocaleTimeString() : '-'}
+                                                                </div>
+                                                            </>
+                                                        );
+                                                    })()}
                                                 </div>
                                                 <div className="text-foreground font-medium">{trade.ticker}</div>
                                                 <div className="text-center">

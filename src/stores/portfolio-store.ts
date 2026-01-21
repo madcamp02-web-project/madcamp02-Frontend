@@ -34,15 +34,15 @@ export const usePortfolioStore = create<PortfolioState>((set, get) => ({
         set({ isLoading: true, error: null });
         try {
             const response = await tradeApi.getPortfolio();
-            set({ 
+            set({
                 summary: response.summary,
                 positions: response.positions,
-                isLoading: false 
+                isLoading: false
             });
         } catch (error: any) {
-            set({ 
+            set({
                 error: error.response?.data?.message || 'Failed to fetch portfolio',
-                isLoading: false 
+                isLoading: false
             });
             throw error;
         }
@@ -52,14 +52,16 @@ export const usePortfolioStore = create<PortfolioState>((set, get) => ({
         set({ isLoading: true, error: null });
         try {
             const response = await tradeApi.getHistory();
-            set({ 
+            console.log('Trade History Response:', response);
+            console.log('First item:', response.items?.[0]);
+            set({
                 transactions: response.items,
-                isLoading: false 
+                isLoading: false
             });
         } catch (error: any) {
-            set({ 
+            set({
                 error: error.response?.data?.message || 'Failed to fetch trade history',
-                isLoading: false 
+                isLoading: false
             });
             throw error;
         }
@@ -69,14 +71,14 @@ export const usePortfolioStore = create<PortfolioState>((set, get) => ({
         set({ isLoading: true, error: null });
         try {
             const response = await tradeApi.getAvailableBalance();
-            set({ 
+            set({
                 availableBalance: response.availableBalance,
-                isLoading: false 
+                isLoading: false
             });
         } catch (error: any) {
-            set({ 
+            set({
                 error: error.response?.data?.message || 'Failed to fetch available balance',
-                isLoading: false 
+                isLoading: false
             });
             throw error;
         }
@@ -93,9 +95,9 @@ export const usePortfolioStore = create<PortfolioState>((set, get) => ({
                 get().fetchHistory(),
             ]);
         } catch (error: any) {
-            set({ 
+            set({
                 error: error.response?.data?.message || 'Failed to place order',
-                isLoading: false 
+                isLoading: false
             });
             throw error;
         }

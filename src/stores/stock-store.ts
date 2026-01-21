@@ -76,6 +76,10 @@ interface StockState {
     updateIndices: (indices: MarketIndicesResponse) => void;
     updateQuoteFromWebSocket: (ticker: string, price: number, volume: number, timestamp: number) => void;
     updateQuoteFromWebSocketMessage: (ticker: string, messageData: any) => void;
+
+    // Global Selection
+    selectedTicker: string;
+    setSelectedTicker: (ticker: string) => void;
 }
 
 export const useStockStore = create<StockState>()(
@@ -102,6 +106,7 @@ export const useStockStore = create<StockState>()(
             movers: null,
             news: null,
         },
+        selectedTicker: 'AAPL',
 
         updatePrice: (price) =>
             set((state) => {
@@ -116,6 +121,11 @@ export const useStockStore = create<StockState>()(
                 state.isUsingCache.indices = false; // 실시간 데이터 사용 중
             }),
 
+        setSelectedTicker: (ticker) =>
+            set((state) => {
+                state.selectedTicker = ticker;
+            }),
+
         // 실시간 trade 데이터 추가 (차트용)
         addRealtimeTrade: (ticker, price, volume, timestamp) =>
             set((state) => {
@@ -123,14 +133,14 @@ export const useStockStore = create<StockState>()(
                     state.realtimeTrades.set(ticker, []);
                 }
                 const trades = state.realtimeTrades.get(ticker)!;
-                
+
                 // 최근 1시간치 trade만 유지 (메모리 관리)
                 const oneHourAgo = timestamp - (60 * 60 * 1000);
                 const filteredTrades = trades.filter(t => t.timestamp > oneHourAgo);
-                
+
                 // 새 trade 추가
                 filteredTrades.push({ price, volume, timestamp });
-                
+
                 state.realtimeTrades.set(ticker, filteredTrades);
             }),
 
@@ -148,23 +158,23 @@ export const useStockStore = create<StockState>()(
                     const previousClose = state.currentQuote.previousClose || state.currentQuote.price || 0;
                     const change = previousClose > 0 ? price - previousClose : 0;
                     const changePercent = previousClose > 0 ? (change / previousClose) * 100 : 0;
-                    
+
                     // 시가(Open): 하루의 첫 거래 가격이므로, 아직 설정되지 않았거나 현재가가 더 낮으면 업데이트
                     const currentOpen = state.currentQuote.open;
                     const newOpen = currentOpen === undefined || currentOpen === 0 ? price : currentOpen;
-                    
+
                     // 고가(High): 현재가가 기존 고가보다 높으면 업데이트
                     const currentHigh = state.currentQuote.high || price;
                     const newHigh = Math.max(currentHigh, price);
-                    
+
                     // 저가(Low): 현재가가 기존 저가보다 낮으면 업데이트
                     const currentLow = state.currentQuote.low || price;
                     const newLow = Math.min(currentLow, price);
-                    
+
                     // 거래량(Volume): 실시간으로 누적
                     const currentVolume = state.currentQuote.volume || 0;
                     const newVolume = volume > 0 ? Math.max(currentVolume, volume) : currentVolume;
-                    
+
                     state.currentQuote = {
                         ...state.currentQuote,
                         price,
@@ -233,7 +243,7 @@ export const useStockStore = create<StockState>()(
                         volume,
                         timestamp,
                     };
-                    
+
                     console.log(`[updateQuoteFromWebSocketMessage] prices 업데이트 (${ticker}):`, {
                         price,
                         change,
@@ -245,12 +255,12 @@ export const useStockStore = create<StockState>()(
                     const price = messageData.price || 0;
                     const volume = messageData.volume || 0;
                     const timestamp = messageData.ts || Date.now();
-                    
+
                     // 기존 updateQuoteFromWebSocket 로직 호출
                     const previousClose = state.currentQuote?.previousClose || state.prices[ticker]?.price || 0;
                     const change = previousClose > 0 ? price - previousClose : 0;
                     const changePercent = previousClose > 0 ? (change / previousClose) * 100 : 0;
-                    
+
                     if (state.currentQuote && state.currentQuote.ticker === ticker) {
                         const currentOpen = state.currentQuote.open;
                         const newOpen = currentOpen === undefined || currentOpen === 0 ? price : currentOpen;
@@ -260,7 +270,7 @@ export const useStockStore = create<StockState>()(
                         const newLow = Math.min(currentLow, price);
                         const currentVolume = state.currentQuote.volume || 0;
                         const newVolume = volume > 0 ? Math.max(currentVolume, volume) : currentVolume;
-                        
+
                         state.currentQuote = {
                             ...state.currentQuote,
                             price,
@@ -290,7 +300,7 @@ export const useStockStore = create<StockState>()(
                 state.isLoading = true;
                 state.error = null;
             });
-            
+
             // 프론트엔드 캐시에서 먼저 조회 (즉시 표시)
             const cached = getCache<MarketIndicesResponse>(CACHE_KEYS.MARKET_INDICES);
             if (cached) {
@@ -299,13 +309,13 @@ export const useStockStore = create<StockState>()(
                     state.isUsingCache.indices = true;
                 });
             }
-            
+
             try {
                 const response = await stockApi.getIndices();
-                
+
                 // 백엔드 캐시 메타데이터 추출 (Phase 3.6)
                 const cacheMetadata = (response as any).cacheMetadata as BackendCacheMetadata | undefined;
-                
+
                 // 성공 시 프론트엔드 캐시 업데이트 및 상태 업데이트
                 setCache(CACHE_KEYS.MARKET_INDICES, response);
                 set((state) => {
@@ -317,11 +327,11 @@ export const useStockStore = create<StockState>()(
                     state.backendCache.indices = cacheMetadata || null;
                 });
             } catch (error: any) {
-                const errorMessage = error.response?.data?.message 
-                    || error.message 
+                const errorMessage = error.response?.data?.message
+                    || error.message
                     || (error.code === 'ERR_NETWORK' ? '네트워크 연결을 확인해주세요' : '지수 데이터를 불러오는데 실패했습니다');
                 console.error('[fetchIndices] Error:', error);
-                
+
                 // 백엔드에서 STALE 데이터를 반환했는지 확인 (Phase 3.6)
                 const cacheMetadata = (error.response as any)?.cacheMetadata as BackendCacheMetadata | undefined;
                 if (cacheMetadata?.status === 'STALE' && error.response?.data) {
@@ -336,7 +346,7 @@ export const useStockStore = create<StockState>()(
                     });
                     return;
                 }
-                
+
                 // 프론트엔드 캐시된 데이터가 있으면 에러를 표시하지 않고 캐시 사용
                 const cached = getCache<MarketIndicesResponse>(CACHE_KEYS.MARKET_INDICES);
                 if (cached) {
@@ -365,7 +375,7 @@ export const useStockStore = create<StockState>()(
                 state.isLoading = true;
                 state.error = null;
             });
-            
+
             // 프론트엔드 캐시에서 먼저 조회 (즉시 표시)
             const cached = getCache<MarketMoversResponse>(CACHE_KEYS.MARKET_MOVERS);
             if (cached) {
@@ -374,13 +384,13 @@ export const useStockStore = create<StockState>()(
                     state.isUsingCache.movers = true;
                 });
             }
-            
+
             try {
                 const response = await stockApi.getMovers();
-                
+
                 // 백엔드 캐시 메타데이터 추출 (Phase 3.6)
                 const cacheMetadata = (response as any).cacheMetadata as BackendCacheMetadata | undefined;
-                
+
                 // 성공 시 프론트엔드 캐시 업데이트 및 상태 업데이트
                 setCache(CACHE_KEYS.MARKET_MOVERS, response);
                 set((state) => {
@@ -392,11 +402,11 @@ export const useStockStore = create<StockState>()(
                     state.backendCache.movers = cacheMetadata || null;
                 });
             } catch (error: any) {
-                const errorMessage = error.response?.data?.message 
-                    || error.message 
+                const errorMessage = error.response?.data?.message
+                    || error.message
                     || (error.code === 'ERR_NETWORK' ? '네트워크 연결을 확인해주세요' : '시장 동향 데이터를 불러오는데 실패했습니다');
                 console.error('[fetchMovers] Error:', error);
-                
+
                 // 백엔드에서 STALE 데이터를 반환했는지 확인 (Phase 3.6)
                 const cacheMetadata = (error.response as any)?.cacheMetadata as BackendCacheMetadata | undefined;
                 if (cacheMetadata?.status === 'STALE' && error.response?.data) {
@@ -411,7 +421,7 @@ export const useStockStore = create<StockState>()(
                     });
                     return;
                 }
-                
+
                 // 프론트엔드 캐시된 데이터가 있으면 에러를 표시하지 않고 캐시 사용
                 const cached = getCache<MarketMoversResponse>(CACHE_KEYS.MARKET_MOVERS);
                 if (cached) {
@@ -439,7 +449,7 @@ export const useStockStore = create<StockState>()(
                 state.isLoading = true;
                 state.error = null;
             });
-            
+
             // 프론트엔드 캐시에서 먼저 조회 (즉시 표시)
             const cached = getCache<MarketNewsResponse>(CACHE_KEYS.MARKET_NEWS);
             if (cached) {
@@ -448,13 +458,13 @@ export const useStockStore = create<StockState>()(
                     state.isUsingCache.news = true;
                 });
             }
-            
+
             try {
                 const response = await stockApi.getNews();
-                
+
                 // 백엔드 캐시 메타데이터 추출 (Phase 3.6)
                 const cacheMetadata = (response as any).cacheMetadata as BackendCacheMetadata | undefined;
-                
+
                 // 성공 시 프론트엔드 캐시 업데이트 및 상태 업데이트
                 setCache(CACHE_KEYS.MARKET_NEWS, response);
                 set((state) => {
@@ -466,11 +476,11 @@ export const useStockStore = create<StockState>()(
                     state.backendCache.news = cacheMetadata || null;
                 });
             } catch (error: any) {
-                const errorMessage = error.response?.data?.message 
-                    || error.message 
+                const errorMessage = error.response?.data?.message
+                    || error.message
                     || (error.code === 'ERR_NETWORK' ? '네트워크 연결을 확인해주세요' : '뉴스 데이터를 불러오는데 실패했습니다');
                 console.error('[fetchNews] Error:', error);
-                
+
                 // 백엔드에서 STALE 데이터를 반환했는지 확인 (Phase 3.6)
                 const cacheMetadata = (error.response as any)?.cacheMetadata as BackendCacheMetadata | undefined;
                 if (cacheMetadata?.status === 'STALE' && error.response?.data) {
@@ -485,7 +495,7 @@ export const useStockStore = create<StockState>()(
                     });
                     return;
                 }
-                
+
                 // 프론트엔드 캐시된 데이터가 있으면 에러를 표시하지 않고 캐시 사용
                 const cached = getCache<MarketNewsResponse>(CACHE_KEYS.MARKET_NEWS);
                 if (cached) {
@@ -533,7 +543,7 @@ export const useStockStore = create<StockState>()(
                 state.isLoading = true;
                 state.error = null;
             });
-            
+
             // 프론트엔드 캐시에서 먼저 조회 (즉시 표시)
             const cached = getCache<StockQuoteResponse>(CACHE_KEYS.STOCK_QUOTE(ticker));
             if (cached) {
@@ -549,7 +559,7 @@ export const useStockStore = create<StockState>()(
                     };
                 });
             }
-            
+
             try {
                 const response = await stockApi.getQuote(ticker);
                 console.log(`[fetchQuote] API 응답 (${ticker}):`, response);
@@ -570,11 +580,11 @@ export const useStockStore = create<StockState>()(
                     state.error = null;
                 });
             } catch (error: any) {
-                const errorMessage = error.response?.data?.message 
-                    || error.message 
+                const errorMessage = error.response?.data?.message
+                    || error.message
                     || (error.code === 'ERR_NETWORK' ? '네트워크 연결을 확인해주세요' : '종목 정보를 불러오는데 실패했습니다');
                 console.error('[fetchQuote] Error:', error);
-                
+
                 // 캐시된 데이터가 있으면 에러를 표시하지 않고 캐시 사용
                 const cached = getCache<StockQuoteResponse>(CACHE_KEYS.STOCK_QUOTE(ticker));
                 if (cached) {
@@ -608,10 +618,10 @@ export const useStockStore = create<StockState>()(
                 state.isLoading = true;
                 state.error = null;
             });
-            
+
             // 프론트엔드 캐시에서 먼저 조회 (즉시 표시)
             // 백엔드 V8 마이그레이션 이후: resolution별로 캐시 키 구분 (d, w, m)
-            const cacheKey = timeframe 
+            const cacheKey = timeframe
                 ? `${CACHE_KEYS.STOCK_CANDLES(ticker)}_${timeframe}`
                 : CACHE_KEYS.STOCK_CANDLES(ticker);
             const cached = getCache<CandlesResponse>(cacheKey);
@@ -620,7 +630,7 @@ export const useStockStore = create<StockState>()(
                     state.candles = cached;
                 });
             }
-            
+
             try {
                 const response = await stockApi.getCandles(ticker, timeframe);
                 console.log(`[fetchCandles] API 응답 (${ticker}, ${timeframe}):`, {
@@ -633,7 +643,7 @@ export const useStockStore = create<StockState>()(
                     lastItem: response.items?.[response.items.length - 1],
                     fullResponse: response, // 전체 응답 로깅
                 });
-                
+
                 // 백엔드 배치 로드 전략에 따라:
                 // - d 요청 시 d가 없으면 d, w, m 모두 로드됨 (Quota 1회)
                 // - w 요청 시 w가 없으면 w만 로드됨 (Quota 1회)
@@ -642,12 +652,12 @@ export const useStockStore = create<StockState>()(
                 if (timeframe && response.resolution !== timeframe) {
                     console.warn(`[fetchCandles] Resolution 불일치: 요청=${timeframe}, 응답=${response.resolution}`);
                 }
-                
+
                 // items가 비어있고 warning이 있으면 경고 로깅
                 if ((!response.items || response.items.length === 0) && response.warning) {
                     console.warn(`[fetchCandles] items가 비어있습니다. Warning: ${response.warning}`);
                 }
-                
+
                 // 성공 시 캐시 업데이트 및 상태 업데이트 (items가 비어있어도 응답은 저장)
                 // resolution별로 캐시 키 구분하여 저장
                 setCache(cacheKey, response);
@@ -656,14 +666,14 @@ export const useStockStore = create<StockState>()(
                     state.isLoading = false;
                     state.error = null;
                 });
-                
+
                 return response; // 응답 반환
             } catch (error: any) {
-                const errorMessage = error.response?.data?.message 
-                    || error.message 
+                const errorMessage = error.response?.data?.message
+                    || error.message
                     || (error.code === 'ERR_NETWORK' ? '네트워크 연결을 확인해주세요' : '차트 데이터를 불러오는데 실패했습니다');
                 console.error('[fetchCandles] Error:', error);
-                
+
                 // 캐시된 데이터가 있으면 에러를 표시하지 않고 캐시 사용
                 const cached = getCache<CandlesResponse>(cacheKey);
                 if (cached) {
@@ -689,7 +699,7 @@ export const useStockStore = create<StockState>()(
                 state.isLoading = true;
                 state.error = null;
             });
-            
+
             // 프론트엔드 캐시에서 먼저 조회 (즉시 표시)
             const cached = getCache<OrderbookResponse>(CACHE_KEYS.STOCK_ORDERBOOK(ticker));
             if (cached) {
@@ -697,7 +707,7 @@ export const useStockStore = create<StockState>()(
                     state.orderbook = cached;
                 });
             }
-            
+
             try {
                 const response = await stockApi.getOrderbook(ticker);
                 // 성공 시 캐시 업데이트 및 상태 업데이트 (호가는 실시간성이 중요하므로 짧은 TTL)
@@ -711,8 +721,8 @@ export const useStockStore = create<StockState>()(
                 // 에러를 조용히 처리 (호가는 실시간성이 중요하므로 실패해도 UI에 표시하지 않음)
                 // 개발 환경에서만 상세 로그 출력
                 if (process.env.NODE_ENV === 'development') {
-                    const errorMessage = error.response?.data?.message 
-                        || error.message 
+                    const errorMessage = error.response?.data?.message
+                        || error.message
                         || (error.code === 'ERR_NETWORK' ? '네트워크 연결을 확인해주세요' : '호가 데이터를 불러오는데 실패했습니다');
                     console.warn('[fetchOrderbook] 호가 데이터 로드 실패 (조용히 처리):', {
                         ticker,
@@ -721,7 +731,7 @@ export const useStockStore = create<StockState>()(
                         status: error.response?.status,
                     });
                 }
-                
+
                 // 캐시된 데이터가 있으면 에러를 표시하지 않고 캐시 사용
                 const cached = getCache<OrderbookResponse>(CACHE_KEYS.STOCK_ORDERBOOK(ticker));
                 if (cached) {

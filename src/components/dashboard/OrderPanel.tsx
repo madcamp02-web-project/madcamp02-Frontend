@@ -25,10 +25,10 @@ export default function OrderPanel({ ticker: tickerProp }: OrderPanelProps) {
         fetchAvailableBalance,
     } = usePortfolioStore();
 
-    const { currentQuote, fetchQuote: fetchStockQuote } = useStockStore();
+    const { currentQuote, fetchQuote: fetchStockQuote, selectedTicker } = useStockStore();
 
     // Determine current ticker
-    const ticker = tickerProp || 'AAPL'; // Default to AAPL
+    const ticker = tickerProp || selectedTicker;
 
     // 초기 로드
     useEffect(() => {
@@ -127,13 +127,13 @@ export default function OrderPanel({ ticker: tickerProp }: OrderPanelProps) {
                     onClick={() => setTab('buy')}
                     className={`flex-1 py-2 rounded-xl text-sm font-bold transition-all duration-200 ${tab === 'buy' ? 'bg-red-500 text-white shadow-md' : 'text-muted-foreground hover:text-foreground'}`}
                 >
-                    매수 (Buy)
+                    매수
                 </button>
                 <button
                     onClick={() => setTab('sell')}
                     className={`flex-1 py-2 rounded-xl text-sm font-bold transition-all duration-200 ${tab === 'sell' ? 'bg-blue-500 text-white shadow-md' : 'text-muted-foreground hover:text-foreground'}`}
                 >
-                    매도 (Sell)
+                    매도
                 </button>
             </div>
 
@@ -143,13 +143,13 @@ export default function OrderPanel({ ticker: tickerProp }: OrderPanelProps) {
                     onClick={() => setOrderType('market')}
                     className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all duration-200 ${orderType === 'market' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
                 >
-                    시장가 (Market)
+                    시장가
                 </button>
                 <button
                     onClick={() => setOrderType('limit')}
                     className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all duration-200 ${orderType === 'limit' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
                 >
-                    지정가 (Limit)
+                    지정가
                 </button>
             </div>
 
