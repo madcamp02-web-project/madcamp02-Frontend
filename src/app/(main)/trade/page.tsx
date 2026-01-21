@@ -7,10 +7,19 @@ import { usePortfolioStore } from '@/stores/portfolio-store';
 import { useStockStore } from '@/stores/stock-store';
 import { socketClient } from '@/lib/api/socket-client';
 
-// Helper to format timestamp to HH:mm:ss
-const formatTime = (dateString: string) => {
+// Helper to format timestamp to MM/dd HH:mm:ss
+const formatTime = (dateString: string | number | Date) => {
+  if (!dateString) return '--';
   const date = new Date(dateString);
-  return date.toLocaleTimeString('en-GB', { hour12: false });
+  if (isNaN(date.getTime())) return '--';
+
+  const month = (date.getMonth() + 1).toString().padStart(2, '0');
+  const day = date.getDate().toString().padStart(2, '0');
+  const hours = date.getHours().toString().padStart(2, '0');
+  const minutes = date.getMinutes().toString().padStart(2, '0');
+  const seconds = date.getSeconds().toString().padStart(2, '0');
+
+  return `${month}/${day} ${hours}:${minutes}:${seconds}`;
 };
 
 export default function TradePage() {
@@ -48,6 +57,7 @@ export default function TradePage() {
     availableBalance,
     fetchAvailableBalance,
     fetchHistory,
+    fetchPortfolio,
   } = usePortfolioStore();
 
   // 초기 로드
@@ -55,7 +65,8 @@ export default function TradePage() {
     loadWatchlist().catch(() => { });
     fetchAvailableBalance().catch(() => { });
     fetchHistory().catch(() => { });
-  }, [loadWatchlist, fetchAvailableBalance, fetchHistory]);
+    fetchPortfolio().catch(() => { });
+  }, [loadWatchlist, fetchAvailableBalance, fetchHistory, fetchPortfolio]);
 
   // 관심종목 목록이 로드되면 WebSocket 구독만 설정
   // 백엔드 StockSubscriptionManager가 활성 구독을 추적하고,
@@ -399,7 +410,7 @@ export default function TradePage() {
                         ? stock.price.toLocaleString(undefined, { maximumFractionDigits: 2 })
                         : '--'}
                     </div>
-                    <div className={`text-xs ${stock.change?.startsWith('+') ? 'text-green-500' : stock.change?.startsWith('-') ? 'text-red-500' : 'text-muted-foreground'}`}>
+                    <div className={`text-xs ${stock.change?.startsWith('+') ? 'text-red-500' : stock.change?.startsWith('-') ? 'text-blue-500' : 'text-muted-foreground'}`}>
                       {stock.change || '--'}
                     </div>
                   </div>
@@ -434,7 +445,7 @@ export default function TradePage() {
                   ${(selectedStock.price ?? 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}
                 </div>
                 {selectedStock.changePercent !== undefined && (
-                  <div className={`px-2 py-1 rounded text-sm font-bold ${selectedStock.changePercent >= 0 ? 'text-green-500 bg-green-500/10' : 'text-red-500 bg-red-500/10'}`}>
+                  <div className={`px-2 py-1 rounded text-sm font-bold ${selectedStock.changePercent >= 0 ? 'text-red-500 bg-red-500/10' : 'text-blue-500 bg-blue-500/10'}`}>
                     {selectedStock.changePercent >= 0 ? '↗' : '↘'} {selectedStock.changePercent >= 0 ? '+' : ''}{selectedStock.changePercent.toFixed(2)}%
                   </div>
                 )}
@@ -454,7 +465,7 @@ export default function TradePage() {
               {/* 고가(High) - 실시간 업데이트 */}
               <div>
                 <span className="text-muted-foreground">고가(High)</span>
-                <span className="text-green-500 font-semibold ml-2">
+                <span className="text-red-500 font-semibold ml-2">
                   {currentQuote?.high !== undefined && currentQuote.high > 0
                     ? `$${currentQuote.high.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
                     : '--'}
@@ -463,7 +474,7 @@ export default function TradePage() {
               {/* 저가(Low) - 실시간 업데이트 */}
               <div>
                 <span className="text-muted-foreground">저가(Low)</span>
-                <span className="text-red-500 font-semibold ml-2">
+                <span className="text-blue-500 font-semibold ml-2">
                   {currentQuote?.low !== undefined && currentQuote.low > 0
                     ? `$${currentQuote.low.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
                     : '--'}
@@ -518,8 +529,8 @@ export default function TradePage() {
                         // timeframe 변경 시 useEffect가 자동으로 fetchCandles 호출하므로 중복 호출 제거
                       }}
                       className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${timeframe === tab.value
-                          ? 'bg-green-500/20 text-green-400'
-                          : 'text-muted-foreground hover:text-foreground'
+                        ? 'bg-red-500/20 text-red-500'
+                        : 'text-muted-foreground hover:text-foreground'
                         }`}
                     >
                       {tab.label}
@@ -547,10 +558,10 @@ export default function TradePage() {
                 <div className="space-y-1">
                   {orderbook ? (
                     <>
-                      {/* 매도호가 (빨간색) */}
+                      {/* 매도호가 (파란색 - Sell) */}
                       {orderbook.asks.slice().reverse().map((item, idx) => (
                         <div key={`ask-${idx}-${item.price}`} className="flex justify-between text-sm py-1">
-                          <span className="text-red-500 font-mono">${(item.price ?? 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
+                          <span className="text-blue-500 font-mono">${(item.price ?? 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
                           <span className="text-muted-foreground font-mono">{(item.quantity ?? 0).toLocaleString()}</span>
                         </div>
                       ))}
@@ -558,10 +569,10 @@ export default function TradePage() {
                       <div className="py-2 my-1 bg-secondary rounded-lg text-center">
                         <span className="text-foreground font-bold text-lg">${(selectedStock.price ?? 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
                       </div>
-                      {/* 매수호가 (파란색) */}
+                      {/* 매수호가 (빨간색 - Buy) */}
                       {orderbook.bids.map((item, idx) => (
                         <div key={`bid-${idx}-${item.price}`} className="flex justify-between text-sm py-1">
-                          <span className="text-blue-500 font-mono">${(item.price ?? 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
+                          <span className="text-red-500 font-mono">${(item.price ?? 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
                           <span className="text-muted-foreground font-mono">{(item.quantity ?? 0).toLocaleString()}</span>
                         </div>
                       ))}
@@ -580,12 +591,9 @@ export default function TradePage() {
                     <div className="text-center text-muted-foreground py-10 text-sm">체결 내역이 없습니다.</div>
                   ) : (
                     recentTrades.map((trade, idx) => (
-                      <div key={idx} className={`flex justify-between text-sm py-1 ${
-                        // @ts-ignore
-                        trade.isUser ? 'bg-accent/20 rounded px-1 -mx-1' : ''
-                        }`}>
-                        <span className="text-muted-foreground font-mono">{trade.time}</span>
-                        <span className={`font-mono ${trade.type === 'buy' ? 'text-green-500' : 'text-blue-500'}`}>
+                      <div key={idx} className="flex justify-between text-sm py-1 border-b border-border/30 last:border-0">
+                        <span className="text-muted-foreground font-mono text-xs">{trade.time}</span>
+                        <span className={`font-mono ${trade.type === 'buy' ? 'text-red-500' : 'text-blue-500'}`}>
                           {(trade.price ?? 0).toLocaleString()}
                         </span>
                         <span className="text-muted-foreground font-mono">{(trade.quantity ?? 0).toLocaleString()}</span>

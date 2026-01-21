@@ -26,6 +26,7 @@ interface UserState {
     toggleEquip: (itemId: number) => Promise<void>;
     setPublicProfile: (isPublic: boolean) => Promise<void>;
     setRankingJoined: (isJoined: boolean) => Promise<void>;
+    setProfileData: (profile: User) => void;
 }
 
 export const useUserStore = create<UserState>((set, get) => ({
@@ -41,16 +42,16 @@ export const useUserStore = create<UserState>((set, get) => ({
         set({ isLoading: true, error: null });
         try {
             const profile = await userApi.getProfile();
-            set({ 
-                profile, 
+            set({
+                profile,
                 isPublic: profile.isPublic ?? true,
                 isRankingJoined: profile.isRankingJoined ?? true,
-                isLoading: false 
+                isLoading: false
             });
         } catch (error: any) {
-            set({ 
+            set({
                 error: error.response?.data?.message || 'Failed to fetch profile',
-                isLoading: false 
+                isLoading: false
             });
             throw error;
         }
@@ -62,9 +63,9 @@ export const useUserStore = create<UserState>((set, get) => ({
             const response = await gameApi.getInventory();
             set({ items: response.items, isLoading: false });
         } catch (error: any) {
-            set({ 
+            set({
                 error: error.response?.data?.message || 'Failed to fetch inventory',
-                isLoading: false 
+                isLoading: false
             });
             throw error;
         }
@@ -76,9 +77,9 @@ export const useUserStore = create<UserState>((set, get) => ({
             const wallet = await userApi.getWallet();
             set({ wallet, isLoading: false });
         } catch (error: any) {
-            set({ 
+            set({
                 error: error.response?.data?.message || 'Failed to fetch wallet',
-                isLoading: false 
+                isLoading: false
             });
             throw error;
         }
@@ -88,16 +89,16 @@ export const useUserStore = create<UserState>((set, get) => ({
         set({ isLoading: true, error: null });
         try {
             const updatedProfile = await userApi.updateProfile(fields);
-            set({ 
+            set({
                 profile: updatedProfile,
                 isPublic: updatedProfile.isPublic ?? get().isPublic,
                 isRankingJoined: updatedProfile.isRankingJoined ?? get().isRankingJoined,
-                isLoading: false 
+                isLoading: false
             });
         } catch (error: any) {
-            set({ 
+            set({
                 error: error.response?.data?.message || 'Failed to update profile',
-                isLoading: false 
+                isLoading: false
             });
             throw error;
         }
@@ -110,9 +111,9 @@ export const useUserStore = create<UserState>((set, get) => ({
             // Refresh inventory after equip
             await get().fetchInventory();
         } catch (error: any) {
-            set({ 
+            set({
                 error: error.response?.data?.message || 'Failed to equip item',
-                isLoading: false 
+                isLoading: false
             });
             throw error;
         }
@@ -124,5 +125,13 @@ export const useUserStore = create<UserState>((set, get) => ({
 
     setRankingJoined: async (isJoined: boolean) => {
         await get().updateProfile({ isRankingJoined: isJoined });
+    },
+
+    setProfileData: (profileData: User) => {
+        set({
+            profile: profileData,
+            isPublic: profileData.isPublic ?? get().isPublic,
+            isRankingJoined: profileData.isRankingJoined ?? get().isRankingJoined,
+        });
     },
 }));

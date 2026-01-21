@@ -73,7 +73,7 @@ export default function ShopPage() {
 
     // 초기 로드
     useEffect(() => {
-        fetchWallet().catch(() => {});
+        fetchWallet().catch(() => { });
         loadItems();
     }, [fetchWallet]);
 
@@ -95,7 +95,7 @@ export default function ShopPage() {
     };
 
     const activeTheme = themeConfigs[activeTab === 'NAMEPLATE' ? 'name' : activeTab === 'AVATAR' ? 'avatar' : 'theme'];
-    const coins = wallet?.coin || 0;
+    const coins = wallet?.gameCoin || 0;
     const currentItems = items[activeTab] || [];
 
     const handleGacha = async () => {

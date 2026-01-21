@@ -16,7 +16,7 @@ interface TradeChartProps {
 // 백엔드에서 정확한 날짜 범위의 데이터를 제공하므로 샘플링 없이 그대로 변환
 function convertCandlesToChartData(candles: CandleItem[]): CandlestickData<Time>[] {
     if (!candles || candles.length === 0) return [];
-    
+
     // 시간순으로 정렬 후 Lightweight Charts 형식으로 변환
     return candles.map(candle => {
         const time = candle.timestamp as Time;
@@ -44,6 +44,7 @@ export default function TradeChart({ ticker, timeframe = 'd' }: TradeChartProps)
     const [isMounted, setIsMounted] = useState(false); // 클라이언트 마운트 상태
     const lastCandleRef = useRef<CandlestickData<Time> | null>(null); // 마지막 캔들 참조 (실시간 업데이트용)
     const realtimeCandlesRef = useRef<Map<number, CandlestickData<Time>>>(new Map()); // 실시간 캔들 캐시 (timestamp -> candle)
+    const prevTickerRef = useRef<string | null>(null); // 이전 ticker 추적
 
     // 클라이언트에서만 마운트 확인
     useEffect(() => {
@@ -68,7 +69,7 @@ export default function TradeChart({ ticker, timeframe = 'd' }: TradeChartProps)
         if (candles?.ticker !== ticker || candles?.resolution !== timeframe) {
             return; // 다른 ticker/timeframe의 데이터는 무시
         }
-        
+
         if (candles?.items && candles.items.length > 0) {
             console.log('[TradeChart] 차트 데이터 변환 시작, items 개수:', candles.items.length, 'timeframe:', timeframe);
             const convertedData = convertCandlesToChartData(candles.items);
@@ -79,78 +80,83 @@ export default function TradeChart({ ticker, timeframe = 'd' }: TradeChartProps)
                 first: convertedData[0],
                 last: convertedData[convertedData.length - 1],
             });
-            
-            // 중복 업데이트 방지: chartData가 이미 동일한지 확인
+
+            // ticker가 변경된 경우 항상 업데이트 (스킵 로직 무시)
+            const tickerChanged = prevTickerRef.current !== ticker;
+            if (tickerChanged) {
+                console.log('[TradeChart] ticker 변경됨:', prevTickerRef.current, '->', ticker);
+                prevTickerRef.current = ticker;
+            }
+
+            // 현재 chartData가 비어있거나 ticker가 변경된 경우 무조건 업데이트
             const currentDataLength = chartData.length;
-            if (currentDataLength === convertedData.length && currentDataLength > 0) {
-                // 첫 번째와 마지막 캔들 시간 비교
+            if (currentDataLength === 0 || tickerChanged) {
+                console.log('[TradeChart] 초기 데이터 또는 ticker 변경으로 업데이트 진행');
+                setChartData(convertedData);
+            } else if (currentDataLength === convertedData.length && currentDataLength > 0) {
+                // 동일한 ticker에서 중복 업데이트 방지
                 const currentFirstTime = chartData[0]?.time;
                 const newFirstTime = convertedData[0]?.time;
                 const currentLastTime = chartData[currentDataLength - 1]?.time;
                 const newLastTime = convertedData[convertedData.length - 1]?.time;
-                
+
                 if (currentFirstTime === newFirstTime && currentLastTime === newLastTime) {
                     console.log('[TradeChart] 동일한 데이터이므로 업데이트 스킵');
                     return; // 동일한 데이터이면 업데이트하지 않음
                 }
+                setChartData(convertedData);
+            } else {
+                // 길이가 다른 경우 업데이트
+                setChartData(convertedData);
             }
-            
-            setChartData(convertedData);
-            
+
             // 마지막 캔들 저장 (실시간 업데이트용)
             if (convertedData.length > 0) {
                 lastCandleRef.current = convertedData[convertedData.length - 1];
             }
-            
+
             // 차트가 이미 초기화되어 있으면 데이터 업데이트
             if (seriesRef.current && chartRef.current) {
-                // timeframe에 따라 캔들 크기 업데이트
-                const getCandleWidth = (tf: string): number => {
-                    switch (tf) {
-                        case 'd': return 2; // 일봉: 얇은 캔들
-                        case 'w': return 4; // 주봉: 중간 캔들
-                        case 'm': return 6; // 월봉: 두꺼운 캔들
-                        default: return 2;
-                    }
-                };
-                
+                // 모든 timeframe에서 동일한 캔들 크기 사용 (일봉 기준)
+                const candleWidth = 2;
+
                 seriesRef.current.setData(convertedData);
                 seriesRef.current.applyOptions({
-                    priceLineWidth: getCandleWidth(timeframe),
+                    priceLineWidth: candleWidth,
                 });
-                
+
                 // 최신 데이터 중심으로 보이도록 설정
                 if (convertedData.length > 0) {
                     const firstTime = convertedData[0].time;
                     const lastTime = convertedData[convertedData.length - 1].time;
                     const firstTimeValue = typeof firstTime === 'number' ? firstTime : new Date(firstTime as string).getTime() / 1000;
                     const lastTimeValue = typeof lastTime === 'number' ? lastTime : new Date(lastTime as string).getTime() / 1000;
-                    
+
                     // timeframe에 따라 보이는 범위 결정 (최신 데이터 중심)
                     const getVisibleRange = (tf: string, firstTimestamp: number, lastTimestamp: number): { from: number; to: number } => {
                         const now = Math.floor(Date.now() / 1000);
                         let visibleDays = 30; // 기본값: 30일
-                        
+
                         switch (tf) {
                             case 'd': visibleDays = 30; break; // 일봉: 최근 30일
                             case 'w': visibleDays = 84; break; // 주봉: 최근 12주 (84일)
                             case 'm': visibleDays = 365; break; // 월봉: 최근 12개월 (365일)
                         }
-                        
+
                         // 최신 데이터 중심으로, 데이터가 있는 범위 내에서만
                         const to = Math.min(lastTimestamp, now);
                         const from = Math.max(lastTimestamp - (visibleDays * 86400), firstTimestamp);
-                        
+
                         return { from, to };
                     };
-                    
+
                     const visibleRange = getVisibleRange(timeframe, firstTimeValue, lastTimeValue);
                     chartRef.current.timeScale().setVisibleRange({
                         from: visibleRange.from as Time,
                         to: visibleRange.to as Time,
                     });
                 }
-                
+
                 // 시간 축이 제대로 표시되도록 차트 크기 재조정 (공식 문서 권장)
                 // 차트가 렌더링된 후 시간 축이 잘리지 않도록 보장
                 setTimeout(() => {
@@ -161,8 +167,8 @@ export default function TradeChart({ ticker, timeframe = 'd' }: TradeChartProps)
                         }
                     }
                 }, 100);
-                
-                console.log('[TradeChart] 차트 데이터 업데이트 완료:', convertedData.length, '개 데이터, 캔들 크기:', getCandleWidth(timeframe));
+
+                console.log('[TradeChart] 차트 데이터 업데이트 완료:', convertedData.length, '개 데이터, 캔들 크기:', candleWidth);
             }
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -231,9 +237,9 @@ export default function TradeChart({ ticker, timeframe = 'd' }: TradeChartProps)
             try {
                 // 차트에 업데이트 (이미 있으면 업데이트, 없으면 추가)
                 seriesRef.current.update(candle);
-                
+
                 // 마지막 캔들 참조 업데이트
-                if (!lastCandleRef.current || 
+                if (!lastCandleRef.current ||
                     (typeof lastCandleRef.current.time === 'number' ? lastCandleRef.current.time : Math.floor(new Date(lastCandleRef.current.time as string).getTime() / 1000)) < candleTime) {
                     lastCandleRef.current = candle;
                 }
@@ -259,8 +265,8 @@ export default function TradeChart({ ticker, timeframe = 'd' }: TradeChartProps)
 
         // 실시간 trade 데이터가 없을 때만 가격 데이터로 업데이트
         const currentTime = Math.floor(Date.now() / 1000);
-        const lastCandleTime = typeof lastCandleRef.current.time === 'number' 
-            ? lastCandleRef.current.time 
+        const lastCandleTime = typeof lastCandleRef.current.time === 'number'
+            ? lastCandleRef.current.time
             : Math.floor(new Date(lastCandleRef.current.time as string).getTime() / 1000);
 
         const getTimeUnit = (tf: string): number => {
@@ -284,7 +290,7 @@ export default function TradeChart({ ticker, timeframe = 'd' }: TradeChartProps)
                 low: Math.min(lastCandleRef.current.low, priceData.price),
             };
             lastCandleRef.current = updatedCandle;
-            
+
             try {
                 seriesRef.current.update(updatedCandle);
             } catch (error) {
@@ -381,17 +387,9 @@ export default function TradeChart({ ticker, timeframe = 'd' }: TradeChartProps)
         });
 
         // 캔들스틱 시리즈 추가
-        // timeframe에 따라 캔들 크기 조정
-        // 각 기간별로 명확하게 구분되도록 크기 차이를 크게 설정
-        const getCandleWidth = (tf: string): number => {
-            switch (tf) {
-                case 'd': return 2; // 일봉: 얇은 캔들
-                case 'w': return 4; // 주봉: 중간 캔들
-                case 'm': return 6; // 월봉: 두꺼운 캔들
-                default: return 2;
-            }
-        };
-        
+        // 모든 timeframe에서 동일한 캔들 크기 사용 (일봉 기준)
+        const candleWidth = 2;
+
         const candlestickSeries = chart.addSeries(CandlestickSeries, {
             upColor: '#ef4444',      // 빨간색 (상승)
             downColor: '#266bcaff',  // 파란색 (하락)
@@ -399,7 +397,7 @@ export default function TradeChart({ ticker, timeframe = 'd' }: TradeChartProps)
             borderDownColor: '#266bcaff',
             wickUpColor: '#ef4444',
             wickDownColor: '#266bcaff',
-            priceLineWidth: getCandleWidth(timeframe), // timeframe에 따른 캔들 두께
+            priceLineWidth: candleWidth, // 모든 timeframe에서 동일한 캔들 두께
         });
 
         chartRef.current = chart;
@@ -471,7 +469,7 @@ export default function TradeChart({ ticker, timeframe = 'd' }: TradeChartProps)
     // 중복 업데이트 방지를 위해 이전 데이터와 비교
     useEffect(() => {
         if (!seriesRef.current || chartData.length === 0 || !chartRef.current) return;
-        
+
         // 이미 동일한 데이터가 설정되어 있는지 확인 (무한 루프 방지)
         try {
             const currentSeriesData = seriesRef.current.data();
@@ -486,33 +484,33 @@ export default function TradeChart({ ticker, timeframe = 'd' }: TradeChartProps)
         } catch (error) {
             // data() 호출 실패 시 무시하고 계속 진행
         }
-        
+
         seriesRef.current.setData(chartData);
-        
+
         // 최신 데이터 중심으로 보이도록 설정
         const firstTime = chartData[0].time;
         const lastTime = chartData[chartData.length - 1].time;
         const firstTimeValue = typeof firstTime === 'number' ? firstTime : new Date(firstTime as string).getTime() / 1000;
         const lastTimeValue = typeof lastTime === 'number' ? lastTime : new Date(lastTime as string).getTime() / 1000;
-        
+
         // timeframe에 따라 보이는 범위 결정 (최신 데이터 중심)
         const getVisibleRange = (tf: string, firstTimestamp: number, lastTimestamp: number): { from: number; to: number } => {
             const now = Math.floor(Date.now() / 1000);
             let visibleDays = 30;
-            
+
             switch (tf) {
                 case 'd': visibleDays = 30; break; // 일봉: 최근 30일
                 case 'w': visibleDays = 84; break; // 주봉: 최근 12주 (84일)
                 case 'm': visibleDays = 365; break; // 월봉: 최근 12개월 (365일)
             }
-            
+
             // 최신 데이터 중심으로, 데이터가 있는 범위 내에서만
             const to = Math.min(lastTimeValue, now);
             const from = Math.max(lastTimeValue - (visibleDays * 86400), firstTimeValue);
-            
+
             return { from, to };
         };
-        
+
         const visibleRange = getVisibleRange(timeframe, firstTimeValue, lastTimeValue);
         chartRef.current.timeScale().setVisibleRange({
             from: visibleRange.from as Time,
@@ -532,17 +530,22 @@ export default function TradeChart({ ticker, timeframe = 'd' }: TradeChartProps)
     }
 
     return (
-        <div className="w-full h-full" suppressHydrationWarning>
-            {isLoading && chartData.length === 0 ? (
-                <div className="h-[320px] bg-background rounded-lg flex items-center justify-center text-muted-foreground">
+        <div className="w-full h-full relative" suppressHydrationWarning>
+            {/* 차트 컨테이너는 항상 렌더링 - 차트 초기화를 위해 필수 */}
+            <div ref={chartContainerRef} className="w-full h-[320px] overflow-hidden pb-0" suppressHydrationWarning style={{ paddingBottom: 0 }} />
+
+            {/* 로딩 상태 오버레이 */}
+            {isLoading && chartData.length === 0 && (
+                <div className="absolute inset-0 h-[320px] bg-background/80 rounded-lg flex items-center justify-center text-muted-foreground z-10">
                     차트 데이터를 불러오는 중...
                 </div>
-            ) : chartData.length === 0 ? (
-                <div className="h-[320px] bg-background rounded-lg flex items-center justify-center text-muted-foreground">
+            )}
+
+            {/* 데이터 없음 오버레이 */}
+            {!isLoading && chartData.length === 0 && (
+                <div className="absolute inset-0 h-[320px] bg-background/80 rounded-lg flex items-center justify-center text-muted-foreground z-10">
                     차트 데이터가 없습니다
                 </div>
-            ) : (
-                <div ref={chartContainerRef} className="w-full h-[320px] overflow-hidden pb-0" suppressHydrationWarning style={{ paddingBottom: 0 }} />
             )}
             {/* 경고 메시지 제거 - WebSocket으로 실시간 데이터 수신 */}
         </div>

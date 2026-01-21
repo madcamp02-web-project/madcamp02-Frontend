@@ -34,7 +34,8 @@ export interface SajuInfo {
 }
 
 export interface Wallet {
-    balance: number; // 예수금
-    coin: number;    // 가챠 코인
-    totalAsset: number;
+    cashBalance: number; // 예수금
+    gameCoin: number;    // 가챠 코인
+    totalAssets: number;
+    realizedProfit: number;
 }
